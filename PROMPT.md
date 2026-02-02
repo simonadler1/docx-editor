@@ -4,12 +4,12 @@ We are building a **complete WYSIWYG DOCX editor** with an exploratory approach.
 
 **CRITICAL:** No WYSIWYG Editor imports. Write all code from scratch.
 
-## Reference Implementation: ~/wysiwyg-editor
+## Reference Implementation: reference/wysiwyg-editor
 
-**ALWAYS reference ~/wysiwyg-editor when unsure how to implement something.** This is a working DOCX editor you can learn from:
+**ALWAYS reference reference/wysiwyg-editor when unsure how to implement something.** This is a working DOCX editor you can learn from:
 
 ```
-~/wysiwyg-editor/
+reference/wysiwyg-editor/
 ├── packages/
 │   ├── super-editor/      # Main editor, DOCX import/export
 │   ├── layout-engine/     # Page layout, line breaking
@@ -22,8 +22,8 @@ We are building a **complete WYSIWYG DOCX editor** with an exploratory approach.
 
 **How to use it:**
 
-1. `ls ~/wysiwyg-editor/packages` - see package structure
-2. `cat ~/wysiwyg-editor/packages/super-editor/src/...` - read implementation
+1. `ls reference/wysiwyg-editor/packages` - see package structure
+2. `cat reference/wysiwyg-editor/packages/super-editor/src/...` - read implementation
 3. Look for: parsers, converters, renderers, layout logic
 
 **CRITICAL: Learn from WYSIWYG Editor, but write your own code.** Understand their approach, then implement it yourself. **NEVER copy-paste code verbatim** - this is for legal protection. Read, understand, close the file, then write your own implementation from memory.
@@ -123,24 +123,24 @@ If unsure how to implement a feature:
 
    ```bash
    # Search for keywords
-   grep -r "hyperlink" ~/wysiwyg-editor/packages/super-editor/src/
-   grep -r "parseTable" ~/wysiwyg-editor/packages/
+   grep -r "hyperlink" reference/wysiwyg-editor/packages/super-editor/src/
+   grep -r "parseTable" reference/wysiwyg-editor/packages/
    ```
 
 2. **Read the implementation:**
 
    ```bash
-   cat ~/wysiwyg-editor/packages/super-editor/src/core/converters/v2/importer/...
+   cat reference/wysiwyg-editor/packages/super-editor/src/core/converters/v2/importer/...
    ```
 
 3. **Understand the approach, then write your own code**
 
 **Key WYSIWYG Editor locations:**
 
-- DOCX parsing: `~/wysiwyg-editor/packages/super-editor/src/core/converters/`
-- Style resolution: `~/wysiwyg-editor/packages/style-engine/src/`
-- Layout: `~/wysiwyg-editor/packages/layout-engine/`
-- Font handling: `~/wysiwyg-editor/shared/font-utils/`
+- DOCX parsing: `reference/wysiwyg-editor/packages/super-editor/src/core/converters/`
+- Style resolution: `reference/wysiwyg-editor/packages/style-engine/src/`
+- Layout: `reference/wysiwyg-editor/packages/layout-engine/`
+- Font handling: `reference/wysiwyg-editor/shared/font-utils/`
 
 ---
 
@@ -153,7 +153,7 @@ If unsure how to implement a feature:
 1. **Exploring WYSIWYG Editor implementation:**
 
    ```
-   Task(subagent_type="Explore", prompt="Investigate how ~/wysiwyg-editor handles table parsing. Look at the tableParser, cell merging, borders. Summarize the approach.")
+   Task(subagent_type="Explore", prompt="Investigate how reference/wysiwyg-editor handles table parsing. Look at the tableParser, cell merging, borders. Summarize the approach.")
    ```
 
 2. **Understanding OOXML structure:**
@@ -165,12 +165,12 @@ If unsure how to implement a feature:
 3. **Researching a specific feature:**
 
    ```
-   Task(subagent_type="Explore", prompt="How does WYSIWYG Editor handle theme color resolution? Find the relevant code in ~/wysiwyg-editor and explain the approach.")
+   Task(subagent_type="Explore", prompt="How does WYSIWYG Editor handle theme color resolution? Find the relevant code in reference/wysiwyg-editor and explain the approach.")
    ```
 
 4. **Comparing implementations:**
    ```
-   Task(subagent_type="Explore", prompt="Compare how ~/wysiwyg-editor handles hyperlinks vs bookmarks. What's the difference in parsing and rendering?")
+   Task(subagent_type="Explore", prompt="Compare how reference/wysiwyg-editor handles hyperlinks vs bookmarks. What's the difference in parsing and rendering?")
    ```
 
 **Benefits:**

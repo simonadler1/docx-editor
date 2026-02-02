@@ -1,6 +1,6 @@
 # Development Plan - EigenPal DOCX Editor
 
-**IMPORTANT:** Custom implementation. Reference `~/wysiwyg-editor` for OOXML understanding. No WYSIWYG Editor imports.
+**IMPORTANT:** Custom implementation. Reference `reference/wysiwyg-editor` for OOXML understanding. No WYSIWYG Editor imports.
 
 ## Development Approach
 
@@ -1631,7 +1631,7 @@ This plan is **exploratory and dynamic**. DOCX/OOXML is complex - we discover st
 - No headers/footers rendered
 - No table editing UI
 
-**Approach:** Use `~/wysiwyg-editor` as reference only - implement everything ourselves.
+**Approach:** Use `reference/wysiwyg-editor` as reference only - implement everything ourselves.
 
 ---
 

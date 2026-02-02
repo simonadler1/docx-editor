@@ -44,7 +44,7 @@ A **complete WYSIWYG DOCX editor** with full Microsoft Word fidelity:
 **Exploratory implementation** - DOCX/OOXML is complex, we discover as we build.
 
 1. Explore actual DOCX files with explorer utility
-2. **Reference ~/wysiwyg-editor when unsure** - it's a working implementation
+2. **Reference reference/wysiwyg-editor when unsure** - it's a working implementation
 3. Document findings here
 4. Implement parser + renderer (your own code)
 5. Adapt plan as needed
@@ -53,10 +53,10 @@ A **complete WYSIWYG DOCX editor** with full Microsoft Word fidelity:
 
 ## WYSIWYG Editor Reference Guide
 
-**Always check ~/wysiwyg-editor when unsure how to implement something:**
+**Always check reference/wysiwyg-editor when unsure how to implement something:**
 
 ```
-~/wysiwyg-editor/
+reference/wysiwyg-editor/
 ├── packages/
 │   ├── super-editor/src/
 │   │   ├── core/converters/    # DOCX import/export
@@ -74,11 +74,11 @@ A **complete WYSIWYG DOCX editor** with full Microsoft Word fidelity:
 
 ```bash
 # Find how they parse something
-grep -r "w:hyperlink" ~/wysiwyg-editor/packages/
-grep -r "parseRun" ~/wysiwyg-editor/packages/
+grep -r "w:hyperlink" reference/wysiwyg-editor/packages/
+grep -r "parseRun" reference/wysiwyg-editor/packages/
 
 # Read a specific file
-cat ~/wysiwyg-editor/packages/super-editor/src/core/converters/v2/importer/docxImporter.js
+cat reference/wysiwyg-editor/packages/super-editor/src/core/converters/v2/importer/docxImporter.js
 ```
 
 **Learn the approach, write your own code.**
@@ -91,7 +91,7 @@ cat ~/wysiwyg-editor/packages/super-editor/src/core/converters/v2/importer/docxI
 
 ```
 # Explore WYSIWYG Editor implementation
-Task(subagent_type="Explore", prompt="How does ~/wysiwyg-editor parse tables? Find tableParser and explain the approach.")
+Task(subagent_type="Explore", prompt="How does reference/wysiwyg-editor parse tables? Find tableParser and explain the approach.")
 
 # Understand OOXML structure
 Task(subagent_type="Explore", prompt="Explore word/numbering.xml structure in a sample DOCX. Document the XML format.")
@@ -185,7 +185,7 @@ const newBuffer = await agent.toBuffer();
 
 ---
 
-**CRITICAL:** No WYSIWYG Editor imports. Custom implementation. Reference ~/wysiwyg-editor for learning only.
+**CRITICAL:** No WYSIWYG Editor imports. Custom implementation. Reference reference/wysiwyg-editor for learning only.
 
 ---
 
