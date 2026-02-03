@@ -68,9 +68,9 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 1.2: Create basic paginator
 
-- [ ] Create `src/layout-engine/paginator.ts`
-- [ ] Track current page, cursor Y position, available height
-- [ ] Handle page breaks when content doesn't fit
+- [x] Create `src/layout-engine/paginator.ts`
+- [x] Track current page, cursor Y position, available height
+- [x] Handle page breaks when content doesn't fit
 
 **WYSIWYG Editor reference (concept only):**
 
