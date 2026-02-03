@@ -454,9 +454,9 @@ WYSIWYG Editor is licensed under **AGPL-3.0**. We use it ONLY to understand conc
 
 ### Task 9.3: Replace DocumentViewer with PagedEditor
 
-- [ ] Update DocxEditor to use PagedEditor
-- [ ] Keep DocumentViewer as fallback/read-only option
-- [ ] Migrate existing tests
+- [x] Update DocxEditor to use PagedEditor
+- [x] Keep DocumentViewer as fallback/read-only option
+- [x] Migrate existing tests
 
 ---
 
