@@ -522,14 +522,27 @@ function measureBlocks(blocks: FlowBlock[], contentWidth: number): Measure[] {
     // Only pass zones if they're active (we've reached or passed an anchor block)
     const activeZones = zonesActive ? floatingZones : undefined;
 
-    const measure = measureBlock(block, contentWidth, activeZones, cumulativeY);
+    try {
+      const blockStart = performance.now();
+      const measure = measureBlock(block, contentWidth, activeZones, cumulativeY);
+      const blockTime = performance.now() - blockStart;
+      if (blockTime > 500) {
+        console.warn(
+          `[measureBlocks] Block ${blockIndex} (${block.kind}) took ${Math.round(blockTime)}ms`
+        );
+      }
 
-    // Update cumulative Y for next block
-    if ('totalHeight' in measure) {
-      cumulativeY += measure.totalHeight;
+      // Update cumulative Y for next block
+      if ('totalHeight' in measure) {
+        cumulativeY += measure.totalHeight;
+      }
+
+      return measure;
+    } catch (error) {
+      console.error(`[measureBlocks] Error measuring block ${blockIndex} (${block.kind}):`, error);
+      // Return a minimal measure so we don't crash the entire layout
+      return { totalHeight: 20 } as Measure;
     }
-
-    return measure;
   });
 }
 
@@ -876,66 +889,108 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
      */
     const runLayoutPipeline = useCallback(
       (state: EditorState) => {
+        const pipelineStart = performance.now();
+
         // Capture current epoch for this layout run
         const currentEpoch = syncCoordinator.getDocEpoch();
 
         // Signal layout is starting
         syncCoordinator.onLayoutStart();
 
-        // Step 1: Convert PM doc to flow blocks
-        const newBlocks = toFlowBlocks(state.doc);
-        setBlocks(newBlocks);
+        try {
+          // Step 1: Convert PM doc to flow blocks
+          let stepStart = performance.now();
+          const newBlocks = toFlowBlocks(state.doc);
+          let stepTime = performance.now() - stepStart;
+          if (stepTime > 500) {
+            console.warn(
+              `[PagedEditor] toFlowBlocks took ${Math.round(stepTime)}ms (${newBlocks.length} blocks)`
+            );
+          }
+          setBlocks(newBlocks);
 
-        // Step 2: Measure all blocks
-        const newMeasures = measureBlocks(newBlocks, contentWidth);
-        setMeasures(newMeasures);
+          // Step 2: Measure all blocks
+          stepStart = performance.now();
+          const newMeasures = measureBlocks(newBlocks, contentWidth);
+          stepTime = performance.now() - stepStart;
+          if (stepTime > 1000) {
+            console.warn(
+              `[PagedEditor] measureBlocks took ${Math.round(stepTime)}ms (${newBlocks.length} blocks)`
+            );
+          }
+          setMeasures(newMeasures);
 
-        // Step 3: Layout blocks onto pages
-        // Use document margins directly for WYSIWYG fidelity (matches Word behavior)
-        const newLayout = layoutDocument(newBlocks, newMeasures, {
-          pageSize,
-          margins,
-        });
-        setLayout(newLayout);
+          // Step 3: Layout blocks onto pages
+          // Use document margins directly for WYSIWYG fidelity (matches Word behavior)
+          stepStart = performance.now();
+          const newLayout = layoutDocument(newBlocks, newMeasures, {
+            pageSize,
+            margins,
+          });
+          stepTime = performance.now() - stepStart;
+          if (stepTime > 500) {
+            console.warn(
+              `[PagedEditor] layoutDocument took ${Math.round(stepTime)}ms (${newLayout.pages.length} pages)`
+            );
+          }
+          setLayout(newLayout);
 
-        // Step 3.5: Prepare header/footer content for rendering
-        const headerContentForRender = convertHeaderFooterToContent(headerContent, contentWidth);
-        const footerContentForRender = convertHeaderFooterToContent(footerContent, contentWidth);
+          // Step 3.5: Prepare header/footer content for rendering
+          const headerContentForRender = convertHeaderFooterToContent(headerContent, contentWidth);
+          const footerContentForRender = convertHeaderFooterToContent(footerContent, contentWidth);
 
-        // Step 4: Paint to DOM
-        if (pagesContainerRef.current && painterRef.current) {
-          // Build block lookup
-          const blockLookup: BlockLookup = new Map();
-          for (let i = 0; i < newBlocks.length; i++) {
-            const block = newBlocks[i];
-            const measure = newMeasures[i];
-            if (block && measure) {
-              blockLookup.set(String(block.id), { block, measure });
+          // Step 4: Paint to DOM
+          if (pagesContainerRef.current && painterRef.current) {
+            stepStart = performance.now();
+
+            // Build block lookup
+            const blockLookup: BlockLookup = new Map();
+            for (let i = 0; i < newBlocks.length; i++) {
+              const block = newBlocks[i];
+              const measure = newMeasures[i];
+              if (block && measure) {
+                blockLookup.set(String(block.id), { block, measure });
+              }
+            }
+            painterRef.current.setBlockLookup(blockLookup);
+
+            // Render pages to container (using header/footer content computed above)
+            renderPages(newLayout.pages, pagesContainerRef.current, {
+              pageGap,
+              showShadow: true,
+              pageBackground: '#fff',
+              blockLookup,
+              headerContent: headerContentForRender,
+              footerContent: footerContentForRender,
+              headerDistance: sectionProperties?.headerDistance
+                ? twipsToPixels(sectionProperties.headerDistance)
+                : undefined,
+              footerDistance: sectionProperties?.footerDistance
+                ? twipsToPixels(sectionProperties.footerDistance)
+                : undefined,
+            } as RenderPageOptions & { pageGap?: number; blockLookup?: BlockLookup });
+
+            stepTime = performance.now() - stepStart;
+            if (stepTime > 500) {
+              console.warn(`[PagedEditor] renderPages took ${Math.round(stepTime)}ms`);
+            }
+
+            // Create and expose RenderedDomContext after DOM is painted
+            if (onRenderedDomContextReady) {
+              const domContext = createRenderedDomContext(pagesContainerRef.current, zoom);
+              onRenderedDomContextReady(domContext);
             }
           }
-          painterRef.current.setBlockLookup(blockLookup);
 
-          // Render pages to container (using header/footer content computed above)
-          renderPages(newLayout.pages, pagesContainerRef.current, {
-            pageGap,
-            showShadow: true,
-            pageBackground: '#fff',
-            blockLookup,
-            headerContent: headerContentForRender,
-            footerContent: footerContentForRender,
-            headerDistance: sectionProperties?.headerDistance
-              ? twipsToPixels(sectionProperties.headerDistance)
-              : undefined,
-            footerDistance: sectionProperties?.footerDistance
-              ? twipsToPixels(sectionProperties.footerDistance)
-              : undefined,
-          } as RenderPageOptions & { pageGap?: number; blockLookup?: BlockLookup });
-
-          // Create and expose RenderedDomContext after DOM is painted
-          if (onRenderedDomContextReady) {
-            const domContext = createRenderedDomContext(pagesContainerRef.current, zoom);
-            onRenderedDomContextReady(domContext);
+          const totalTime = performance.now() - pipelineStart;
+          if (totalTime > 2000) {
+            console.warn(
+              `[PagedEditor] Layout pipeline took ${Math.round(totalTime)}ms total ` +
+                `(${newBlocks.length} blocks, ${newMeasures.length} measures)`
+            );
           }
+        } catch (error) {
+          console.error('[PagedEditor] Layout pipeline error:', error);
         }
 
         // Signal layout is complete for this epoch
