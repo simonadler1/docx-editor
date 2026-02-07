@@ -24,6 +24,7 @@ import {
   type Command,
   type Plugin,
 } from 'prosemirror-state';
+import { CellSelection } from 'prosemirror-tables';
 import { EditorView, type DirectEditorProps } from 'prosemirror-view';
 import { undo, redo } from 'prosemirror-history';
 
@@ -95,6 +96,8 @@ export interface HiddenProseMirrorRef {
   canRedo(): boolean;
   /** Set selection by PM position */
   setSelection(anchor: number, head?: number): void;
+  /** Set cell selection between two positions inside table cells */
+  setCellSelection(anchorCellPos: number, headCellPos: number): void;
   /** Scroll the PM view to selection (no-op since hidden) */
   scrollToSelection(): void;
 }
@@ -414,6 +417,18 @@ const HiddenProseMirrorComponent = forwardRef<HiddenProseMirrorRef, HiddenProseM
           const $head = head !== undefined ? state.doc.resolve(head) : $anchor;
           const selection = TextSelection.between($anchor, $head);
           dispatch(state.tr.setSelection(selection));
+        },
+
+        setCellSelection(anchorCellPos: number, headCellPos: number) {
+          if (!viewRef.current) return;
+          const { state, dispatch } = viewRef.current;
+          try {
+            const cellSel = CellSelection.create(state.doc, anchorCellPos, headCellPos);
+            dispatch(state.tr.setSelection(cellSel));
+          } catch {
+            // Fallback to text selection if positions aren't valid for CellSelection
+            this.setSelection(anchorCellPos, headCellPos);
+          }
         },
 
         scrollToSelection() {

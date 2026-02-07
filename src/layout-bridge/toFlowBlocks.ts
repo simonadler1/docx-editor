@@ -633,6 +633,7 @@ function convertTableRow(node: PMNode, startPos: number, options: ToFlowBlocksOp
     id: nextBlockId(),
     cells,
     height: attrs.height ? twipsToPixels(attrs.height as number) : undefined,
+    heightRule: (attrs.heightRule as 'auto' | 'atLeast' | 'exact') ?? undefined,
     isHeader: attrs.isHeader as boolean | undefined,
   };
 }

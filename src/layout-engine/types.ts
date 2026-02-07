@@ -275,6 +275,7 @@ export type TableRow = {
   id: BlockId;
   cells: TableCell[];
   height?: number;
+  heightRule?: 'auto' | 'atLeast' | 'exact';
   isHeader?: boolean;
 };
 

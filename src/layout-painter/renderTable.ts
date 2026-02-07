@@ -29,6 +29,10 @@ export const TABLE_CLASS_NAMES = {
   row: 'layout-table-row',
   cell: 'layout-table-cell',
   cellContent: 'layout-table-cell-content',
+  resizeHandle: 'layout-table-resize-handle',
+  rowResizeHandle: 'layout-table-row-resize-handle',
+  tableEdgeHandleBottom: 'layout-table-edge-handle-bottom',
+  tableEdgeHandleRight: 'layout-table-edge-handle-right',
 };
 
 /**
@@ -438,6 +442,27 @@ export function renderTableFragment(
     tableEl.dataset.pmEnd = String(fragment.pmEnd);
   }
 
+  // Add column resize handles at each column boundary
+  let handleX = 0;
+  for (let col = 0; col < measure.columnWidths.length - 1; col++) {
+    handleX += measure.columnWidths[col] ?? 0;
+    const handle = doc.createElement('div');
+    handle.className = TABLE_CLASS_NAMES.resizeHandle;
+    handle.style.position = 'absolute';
+    handle.style.left = `${handleX - 3}px`;
+    handle.style.top = '0';
+    handle.style.width = '6px';
+    handle.style.height = '100%';
+    handle.style.cursor = 'col-resize';
+    handle.style.zIndex = '10';
+    handle.dataset.columnIndex = String(col);
+    handle.dataset.tableBlockId = String(fragment.blockId);
+    if (fragment.pmStart !== undefined) {
+      handle.dataset.tablePmStart = String(fragment.pmStart);
+    }
+    tableEl.appendChild(handle);
+  }
+
   // Build row Y positions for rowSpan height calculation
   const rowYPositions: number[] = [];
   let yPos = 0;
@@ -472,6 +497,72 @@ export function renderTableFragment(
 
     tableEl.appendChild(rowEl);
     y += rowMeasure.height;
+  }
+
+  // Add row resize handles at each row boundary (between consecutive rows)
+  let handleY = 0;
+  for (let rowIdx = fragment.fromRow; rowIdx < fragment.toRow; rowIdx++) {
+    handleY += measure.rows[rowIdx]?.height ?? 0;
+
+    // Don't add a handle after the last row in this fragment (unless it's the table's last row — that's the bottom edge)
+    if (rowIdx < fragment.toRow - 1) {
+      const rowHandle = doc.createElement('div');
+      rowHandle.className = TABLE_CLASS_NAMES.rowResizeHandle;
+      rowHandle.style.position = 'absolute';
+      rowHandle.style.left = '0';
+      rowHandle.style.top = `${handleY - 3}px`;
+      rowHandle.style.width = '100%';
+      rowHandle.style.height = '6px';
+      rowHandle.style.cursor = 'row-resize';
+      rowHandle.style.zIndex = '10';
+      rowHandle.dataset.rowIndex = String(rowIdx);
+      rowHandle.dataset.tableBlockId = String(fragment.blockId);
+      if (fragment.pmStart !== undefined) {
+        rowHandle.dataset.tablePmStart = String(fragment.pmStart);
+      }
+      tableEl.appendChild(rowHandle);
+    }
+  }
+
+  // Bottom edge handle (only on fragments containing the last row)
+  if (fragment.toRow === block.rows.length) {
+    const bottomHandle = doc.createElement('div');
+    bottomHandle.className = TABLE_CLASS_NAMES.tableEdgeHandleBottom;
+    bottomHandle.style.position = 'absolute';
+    bottomHandle.style.left = '0';
+    bottomHandle.style.top = `${handleY - 3}px`;
+    bottomHandle.style.width = '100%';
+    bottomHandle.style.height = '6px';
+    bottomHandle.style.cursor = 'row-resize';
+    bottomHandle.style.zIndex = '10';
+    bottomHandle.dataset.rowIndex = String(block.rows.length - 1);
+    bottomHandle.dataset.tableBlockId = String(fragment.blockId);
+    bottomHandle.dataset.isEdge = 'bottom';
+    if (fragment.pmStart !== undefined) {
+      bottomHandle.dataset.tablePmStart = String(fragment.pmStart);
+    }
+    tableEl.appendChild(bottomHandle);
+  }
+
+  // Right edge handle (only on fragments containing the last row)
+  if (fragment.toRow === block.rows.length) {
+    const totalWidth = measure.columnWidths.reduce((w, cw) => w + cw, 0);
+    const rightHandle = doc.createElement('div');
+    rightHandle.className = TABLE_CLASS_NAMES.tableEdgeHandleRight;
+    rightHandle.style.position = 'absolute';
+    rightHandle.style.left = `${totalWidth - 3}px`;
+    rightHandle.style.top = '0';
+    rightHandle.style.width = '6px';
+    rightHandle.style.height = '100%';
+    rightHandle.style.cursor = 'col-resize';
+    rightHandle.style.zIndex = '10';
+    rightHandle.dataset.columnIndex = String(measure.columnWidths.length - 1);
+    rightHandle.dataset.tableBlockId = String(fragment.blockId);
+    rightHandle.dataset.isEdge = 'right';
+    if (fragment.pmStart !== undefined) {
+      rightHandle.dataset.tablePmStart = String(fragment.pmStart);
+    }
+    tableEl.appendChild(rightHandle);
   }
 
   return tableEl;

@@ -26,6 +26,7 @@ import React, {
 } from 'react';
 import type { CSSProperties } from 'react';
 import type { EditorState, Transaction, Plugin } from 'prosemirror-state';
+import { CellSelection } from 'prosemirror-tables';
 import type { EditorView } from 'prosemirror-view';
 
 // Internal components
@@ -447,8 +448,9 @@ function measureBlock(
         };
       });
 
-      // Calculate cell heights
-      for (const row of rows) {
+      // Calculate cell heights, respecting explicit row height rules
+      for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+        const row = rows[rowIdx];
         let maxHeight = 0;
         for (const cell of row.cells) {
           cell.height = cell.blocks.reduce((h, m) => {
@@ -458,7 +460,19 @@ function measureBlock(
           }, 0);
           maxHeight = Math.max(maxHeight, cell.height);
         }
-        row.height = maxHeight;
+
+        // Apply heightRule from the source row
+        const sourceRow = tableBlock.rows[rowIdx];
+        const explicitHeight = sourceRow?.height;
+        const heightRule = sourceRow?.heightRule;
+
+        if (explicitHeight && heightRule === 'exact') {
+          row.height = explicitHeight;
+        } else if (explicitHeight && heightRule === 'atLeast') {
+          row.height = Math.max(maxHeight, explicitHeight);
+        } else {
+          row.height = maxHeight;
+        }
       }
 
       const totalHeight = rows.reduce((h, r) => h + r.height, 0);
@@ -872,6 +886,35 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
     const isDraggingRef = useRef(false);
     const dragAnchorRef = useRef<number | null>(null);
 
+    // Column resize state
+    const isResizingColumnRef = useRef(false);
+    const resizeStartXRef = useRef(0);
+    const resizeColumnIndexRef = useRef(0);
+    const resizeTablePmStartRef = useRef(0);
+    const resizeOrigWidthsRef = useRef<{ left: number; right: number }>({ left: 0, right: 0 });
+    const resizeHandleRef = useRef<HTMLElement | null>(null);
+
+    // Row resize state
+    const isResizingRowRef = useRef(false);
+    const resizeStartYRef = useRef(0);
+    const resizeRowIndexRef = useRef(0);
+    const resizeRowTablePmStartRef = useRef(0);
+    const resizeRowOrigHeightRef = useRef(0); // twips
+    const resizeRowHandleRef = useRef<HTMLElement | null>(null);
+    const resizeRowIsEdgeRef = useRef(false);
+
+    // Right edge resize state (grows last column only)
+    const isResizingRightEdgeRef = useRef(false);
+    const resizeRightEdgeStartXRef = useRef(0);
+    const resizeRightEdgeColIndexRef = useRef(0);
+    const resizeRightEdgePmStartRef = useRef(0);
+    const resizeRightEdgeOrigWidthRef = useRef(0); // twips
+    const resizeRightEdgeHandleRef = useRef<HTMLElement | null>(null);
+
+    // Cell selection drag state
+    const isCellDraggingRef = useRef(false);
+    const cellDragAnchorPosRef = useRef<number | null>(null);
+
     // Selection gate - ensures selection renders only when layout is current
     const syncCoordinator = useMemo(() => new LayoutSelectionGate(), []);
 
@@ -1140,6 +1183,45 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
         // Use ref to avoid infinite loops when callback is unstable
         onSelectionChangeRef.current?.(from, to);
 
+        // Update visual cell selection highlighting on visible layout table cells
+        if (pagesContainerRef.current) {
+          // Clear previous cell highlighting
+          const prevSelected = pagesContainerRef.current.querySelectorAll(
+            '.layout-table-cell-selected'
+          );
+          for (const el of Array.from(prevSelected)) {
+            el.classList.remove('layout-table-cell-selected');
+          }
+
+          // If CellSelection, highlight the corresponding visible cells
+          // Use duck-typing ($anchorCell) instead of instanceof to avoid bundling issues
+          const sel = state.selection as CellSelection;
+          const isCellSel = '$anchorCell' in sel && typeof sel.forEachCell === 'function';
+          if (isCellSel) {
+            // Collect ranges [cellStart, cellEnd) for each selected cell
+            const selectedRanges: Array<[number, number]> = [];
+            sel.forEachCell((node, pos) => {
+              selectedRanges.push([pos, pos + node.nodeSize]);
+            });
+
+            // Find visible layout cells whose pmStart falls inside a selected cell range
+            const allCells = pagesContainerRef.current.querySelectorAll('.layout-table-cell');
+            for (const cellEl of Array.from(allCells)) {
+              const htmlEl = cellEl as HTMLElement;
+              const pmStartAttr = htmlEl.dataset.pmStart;
+              if (pmStartAttr !== undefined) {
+                const pmPos = Number(pmStartAttr);
+                for (const [start, end] of selectedRanges) {
+                  if (pmPos >= start && pmPos < end) {
+                    htmlEl.classList.add('layout-table-cell-selected');
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+
         if (!layout || blocks.length === 0) return;
 
         // Collapsed selection - show caret
@@ -1393,17 +1475,170 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
     );
 
     /**
+     * Find the table cell position in ProseMirror doc for a given PM position.
+     * Returns the position just inside the cell node, suitable for CellSelection.create().
+     */
+    const findCellPosFromPmPos = useCallback((pmPos: number): number | null => {
+      const view = hiddenPMRef.current?.getView();
+      if (!view) return null;
+      try {
+        const $pos = view.state.doc.resolve(pmPos);
+        for (let d = $pos.depth; d > 0; d--) {
+          const node = $pos.node(d);
+          if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+            // Return position of the cell node itself (before(d)).
+            // CellSelection.create will resolve this and use cellAround() internally.
+            return $pos.before(d);
+          }
+        }
+      } catch {
+        // Position resolution failed
+      }
+      return null;
+    }, []);
+
+    /**
      * Handle mousedown on pages - start selection or drag.
      */
     const handlePagesMouseDown = useCallback(
       (e: React.MouseEvent) => {
         if (!hiddenPMRef.current || e.button !== 0) return; // Only handle left click
 
+        // Column resize: intercept clicks on resize handles
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('layout-table-resize-handle')) {
+          e.preventDefault();
+          e.stopPropagation();
+          isResizingColumnRef.current = true;
+          resizeStartXRef.current = e.clientX;
+          resizeHandleRef.current = target;
+          target.classList.add('dragging');
+
+          const colIndex = parseInt(target.dataset.columnIndex ?? '0', 10);
+          resizeColumnIndexRef.current = colIndex;
+          resizeTablePmStartRef.current = parseInt(target.dataset.tablePmStart ?? '0', 10);
+
+          // Get current column widths from the ProseMirror doc
+          const view = hiddenPMRef.current.getView();
+          if (view) {
+            const $pos = view.state.doc.resolve(resizeTablePmStartRef.current + 1);
+            for (let d = $pos.depth; d >= 0; d--) {
+              const node = $pos.node(d);
+              if (node.type.name === 'table') {
+                const widths = node.attrs.columnWidths as number[] | null;
+                if (
+                  widths &&
+                  widths[colIndex] !== undefined &&
+                  widths[colIndex + 1] !== undefined
+                ) {
+                  resizeOrigWidthsRef.current = {
+                    left: widths[colIndex],
+                    right: widths[colIndex + 1],
+                  };
+                }
+                break;
+              }
+            }
+          }
+          return;
+        }
+
+        // Row resize: intercept clicks on row resize handles or bottom edge handle
+        if (
+          target.classList.contains('layout-table-row-resize-handle') ||
+          target.classList.contains('layout-table-edge-handle-bottom')
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          isResizingRowRef.current = true;
+          resizeStartYRef.current = e.clientY;
+          resizeRowHandleRef.current = target;
+          resizeRowIsEdgeRef.current = target.dataset.isEdge === 'bottom';
+          target.classList.add('dragging');
+
+          const rowIndex = parseInt(target.dataset.rowIndex ?? '0', 10);
+          resizeRowIndexRef.current = rowIndex;
+          resizeRowTablePmStartRef.current = parseInt(target.dataset.tablePmStart ?? '0', 10);
+
+          // Get current row height from ProseMirror doc
+          const view = hiddenPMRef.current.getView();
+          if (view) {
+            const $pos = view.state.doc.resolve(resizeRowTablePmStartRef.current + 1);
+            for (let d = $pos.depth; d >= 0; d--) {
+              const node = $pos.node(d);
+              if (node.type.name === 'table') {
+                let rowNode: typeof node | null = null;
+                let idx = 0;
+                node.forEach((child) => {
+                  if (idx === rowIndex) rowNode = child;
+                  idx++;
+                });
+                if (rowNode) {
+                  const height = (rowNode as typeof node).attrs.height as number | null;
+                  if (height) {
+                    resizeRowOrigHeightRef.current = height;
+                  } else {
+                    // Estimate from rendered height: find the row element
+                    const tableEl = target.closest('.layout-table');
+                    const rowEl = tableEl?.querySelector(`[data-row-index="${rowIndex}"]`);
+                    const renderedHeight = rowEl
+                      ? (rowEl as HTMLElement).getBoundingClientRect().height
+                      : 30;
+                    resizeRowOrigHeightRef.current = Math.round(renderedHeight * 15);
+                  }
+                }
+                break;
+              }
+            }
+          }
+          return;
+        }
+
+        // Right edge resize: intercept clicks on right edge handle
+        if (target.classList.contains('layout-table-edge-handle-right')) {
+          e.preventDefault();
+          e.stopPropagation();
+          isResizingRightEdgeRef.current = true;
+          resizeRightEdgeStartXRef.current = e.clientX;
+          resizeRightEdgeHandleRef.current = target;
+          target.classList.add('dragging');
+
+          const colIndex = parseInt(target.dataset.columnIndex ?? '0', 10);
+          resizeRightEdgeColIndexRef.current = colIndex;
+          resizeRightEdgePmStartRef.current = parseInt(target.dataset.tablePmStart ?? '0', 10);
+
+          // Get current last column width from ProseMirror doc
+          const view = hiddenPMRef.current.getView();
+          if (view) {
+            const $pos = view.state.doc.resolve(resizeRightEdgePmStartRef.current + 1);
+            for (let d = $pos.depth; d >= 0; d--) {
+              const node = $pos.node(d);
+              if (node.type.name === 'table') {
+                const widths = node.attrs.columnWidths as number[] | null;
+                if (widths && widths[colIndex] !== undefined) {
+                  resizeRightEdgeOrigWidthRef.current = widths[colIndex];
+                }
+                break;
+              }
+            }
+          }
+          return;
+        }
+
         e.preventDefault(); // Prevent native text selection
 
         const pmPos = getPositionFromMouse(e.clientX, e.clientY);
 
         if (pmPos !== null) {
+          // Check if click is inside a table cell - track for potential cell drag selection
+          const cellPos = findCellPosFromPmPos(pmPos);
+          if (cellPos !== null) {
+            cellDragAnchorPosRef.current = cellPos;
+          } else {
+            cellDragAnchorPosRef.current = null;
+          }
+          isCellDraggingRef.current = false;
+
           // Start dragging
           isDraggingRef.current = true;
           dragAnchorRef.current = pmPos;
@@ -1412,6 +1647,8 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
           hiddenPMRef.current.setSelection(pmPos);
         } else {
           // Clicked outside content - move to end
+          cellDragAnchorPosRef.current = null;
+          isCellDraggingRef.current = false;
           const view = hiddenPMRef.current.getView();
           if (view) {
             const endPos = Math.max(0, view.state.doc.content.size - 1);
@@ -1425,7 +1662,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
         hiddenPMRef.current.focus();
         setIsFocused(true);
       },
-      [getPositionFromMouse]
+      [getPositionFromMouse, findCellPosFromPmPos]
     );
 
     /**
@@ -1433,24 +1670,267 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
      */
     const handleMouseMove = useCallback(
       (e: MouseEvent) => {
+        // Column resize drag
+        if (isResizingColumnRef.current) {
+          e.preventDefault();
+          const delta = e.clientX - resizeStartXRef.current;
+          // Move the handle visually
+          if (resizeHandleRef.current) {
+            const origLeft = parseFloat(resizeHandleRef.current.style.left);
+            resizeHandleRef.current.style.left = `${origLeft + delta}px`;
+            resizeStartXRef.current = e.clientX;
+
+            // Update stored widths (convert pixel delta to twips: 1px ≈ 15 twips at 96dpi)
+            const deltaTwips = Math.round(delta * 15);
+            const minWidth = 300; // ~0.2 inches minimum
+            const newLeft = resizeOrigWidthsRef.current.left + deltaTwips;
+            const newRight = resizeOrigWidthsRef.current.right - deltaTwips;
+            if (newLeft >= minWidth && newRight >= minWidth) {
+              resizeOrigWidthsRef.current = { left: newLeft, right: newRight };
+            }
+          }
+          return;
+        }
+
+        // Row resize drag
+        if (isResizingRowRef.current) {
+          e.preventDefault();
+          const delta = e.clientY - resizeStartYRef.current;
+          if (resizeRowHandleRef.current) {
+            const origTop = parseFloat(resizeRowHandleRef.current.style.top);
+            resizeRowHandleRef.current.style.top = `${origTop + delta}px`;
+            resizeStartYRef.current = e.clientY;
+
+            // Update stored height (convert pixel delta to twips)
+            const deltaTwips = Math.round(delta * 15);
+            const minHeight = 200; // ~0.14 inches minimum
+            const newHeight = resizeRowOrigHeightRef.current + deltaTwips;
+            if (newHeight >= minHeight) {
+              resizeRowOrigHeightRef.current = newHeight;
+            }
+          }
+          return;
+        }
+
+        // Right edge resize drag
+        if (isResizingRightEdgeRef.current) {
+          e.preventDefault();
+          const delta = e.clientX - resizeRightEdgeStartXRef.current;
+          if (resizeRightEdgeHandleRef.current) {
+            const origLeft = parseFloat(resizeRightEdgeHandleRef.current.style.left);
+            resizeRightEdgeHandleRef.current.style.left = `${origLeft + delta}px`;
+            resizeRightEdgeStartXRef.current = e.clientX;
+
+            // Update stored width (convert pixel delta to twips)
+            const deltaTwips = Math.round(delta * 15);
+            const minWidth = 300; // ~0.2 inches minimum
+            const newWidth = resizeRightEdgeOrigWidthRef.current + deltaTwips;
+            if (newWidth >= minWidth) {
+              resizeRightEdgeOrigWidthRef.current = newWidth;
+            }
+          }
+          return;
+        }
+
         if (!isDraggingRef.current || dragAnchorRef.current === null) return;
         if (!hiddenPMRef.current || !pagesContainerRef.current) return;
 
         const pmPos = getPositionFromMouse(e.clientX, e.clientY);
         if (pmPos === null) return;
 
-        // Set selection from anchor to current position
+        // Check if we're dragging across table cells
+        if (cellDragAnchorPosRef.current !== null) {
+          const currentCellPos = findCellPosFromPmPos(pmPos);
+          if (currentCellPos !== null && currentCellPos !== cellDragAnchorPosRef.current) {
+            isCellDraggingRef.current = true;
+            hiddenPMRef.current.setCellSelection(cellDragAnchorPosRef.current, currentCellPos);
+            return;
+          }
+          // If already in cell-drag mode but still moving, update head cell
+          if (isCellDraggingRef.current && currentCellPos !== null) {
+            hiddenPMRef.current.setCellSelection(cellDragAnchorPosRef.current, currentCellPos);
+            return;
+          }
+        }
+
+        // Regular text selection drag
         const anchor = dragAnchorRef.current;
         hiddenPMRef.current.setSelection(anchor, pmPos);
       },
-      [getPositionFromMouse]
+      [getPositionFromMouse, findCellPosFromPmPos]
     );
 
     /**
      * Handle mouseup - end drag selection.
      */
     const handleMouseUp = useCallback(() => {
+      // Commit column resize
+      if (isResizingColumnRef.current) {
+        isResizingColumnRef.current = false;
+        if (resizeHandleRef.current) {
+          resizeHandleRef.current.classList.remove('dragging');
+          resizeHandleRef.current = null;
+        }
+
+        // Update ProseMirror document with new column widths
+        const view = hiddenPMRef.current?.getView();
+        if (view) {
+          const pmStart = resizeTablePmStartRef.current;
+          const colIdx = resizeColumnIndexRef.current;
+          const { left: newLeft, right: newRight } = resizeOrigWidthsRef.current;
+
+          // Find the table node and update columnWidths + cell widths
+          const $pos = view.state.doc.resolve(pmStart + 1);
+          for (let d = $pos.depth; d >= 0; d--) {
+            const node = $pos.node(d);
+            if (node.type.name === 'table') {
+              const tablePos = $pos.before(d);
+              const tr = view.state.tr;
+              const widths = [...(node.attrs.columnWidths as number[])];
+              widths[colIdx] = newLeft;
+              widths[colIdx + 1] = newRight;
+
+              // Update table columnWidths attr
+              tr.setNodeMarkup(tablePos, undefined, {
+                ...node.attrs,
+                columnWidths: widths,
+              });
+
+              // Update cell width attrs in each row
+              let rowOffset = tablePos + 1;
+              node.forEach((row) => {
+                let cellOffset = rowOffset + 1;
+                let cellColIdx = 0;
+                row.forEach((cell) => {
+                  const colspan = (cell.attrs.colspan as number) || 1;
+                  if (cellColIdx === colIdx || cellColIdx === colIdx + 1) {
+                    const newWidth = cellColIdx === colIdx ? newLeft : newRight;
+                    tr.setNodeMarkup(tr.mapping.map(cellOffset), undefined, {
+                      ...cell.attrs,
+                      width: newWidth,
+                      widthType: 'dxa',
+                      colwidth: null,
+                    });
+                  }
+                  cellOffset += cell.nodeSize;
+                  cellColIdx += colspan;
+                });
+                rowOffset += row.nodeSize;
+              });
+
+              view.dispatch(tr);
+              break;
+            }
+          }
+        }
+        return;
+      }
+
+      // Commit row resize
+      if (isResizingRowRef.current) {
+        isResizingRowRef.current = false;
+        if (resizeRowHandleRef.current) {
+          resizeRowHandleRef.current.classList.remove('dragging');
+          resizeRowHandleRef.current = null;
+        }
+
+        const view = hiddenPMRef.current?.getView();
+        if (view) {
+          const pmStart = resizeRowTablePmStartRef.current;
+          const rowIdx = resizeRowIndexRef.current;
+          const newHeight = resizeRowOrigHeightRef.current;
+
+          const $pos = view.state.doc.resolve(pmStart + 1);
+          for (let d = $pos.depth; d >= 0; d--) {
+            const node = $pos.node(d);
+            if (node.type.name === 'table') {
+              const tablePos = $pos.before(d);
+              const tr = view.state.tr;
+
+              // Walk to the target row
+              let rowOffset = tablePos + 1;
+              let idx = 0;
+              node.forEach((row) => {
+                if (idx === rowIdx) {
+                  tr.setNodeMarkup(tr.mapping.map(rowOffset), undefined, {
+                    ...row.attrs,
+                    height: newHeight,
+                    heightRule: 'atLeast',
+                  });
+                }
+                rowOffset += row.nodeSize;
+                idx++;
+              });
+
+              view.dispatch(tr);
+              break;
+            }
+          }
+        }
+        return;
+      }
+
+      // Commit right edge resize
+      if (isResizingRightEdgeRef.current) {
+        isResizingRightEdgeRef.current = false;
+        if (resizeRightEdgeHandleRef.current) {
+          resizeRightEdgeHandleRef.current.classList.remove('dragging');
+          resizeRightEdgeHandleRef.current = null;
+        }
+
+        const view = hiddenPMRef.current?.getView();
+        if (view) {
+          const pmStart = resizeRightEdgePmStartRef.current;
+          const colIdx = resizeRightEdgeColIndexRef.current;
+          const newWidth = resizeRightEdgeOrigWidthRef.current;
+
+          const $pos = view.state.doc.resolve(pmStart + 1);
+          for (let d = $pos.depth; d >= 0; d--) {
+            const node = $pos.node(d);
+            if (node.type.name === 'table') {
+              const tablePos = $pos.before(d);
+              const tr = view.state.tr;
+
+              // Update columnWidths — only change last column
+              const widths = [...(node.attrs.columnWidths as number[])];
+              widths[colIdx] = newWidth;
+
+              tr.setNodeMarkup(tablePos, undefined, {
+                ...node.attrs,
+                columnWidths: widths,
+              });
+
+              // Update cell width attrs in the last column of each row
+              let rowOffset = tablePos + 1;
+              node.forEach((row) => {
+                let cellOffset = rowOffset + 1;
+                let cellColIdx = 0;
+                row.forEach((cell) => {
+                  const colspan = (cell.attrs.colspan as number) || 1;
+                  if (cellColIdx === colIdx) {
+                    tr.setNodeMarkup(tr.mapping.map(cellOffset), undefined, {
+                      ...cell.attrs,
+                      width: newWidth,
+                      widthType: 'dxa',
+                      colwidth: null,
+                    });
+                  }
+                  cellOffset += cell.nodeSize;
+                  cellColIdx += colspan;
+                });
+                rowOffset += row.nodeSize;
+              });
+
+              view.dispatch(tr);
+              break;
+            }
+          }
+        }
+        return;
+      }
+
       isDraggingRef.current = false;
+      isCellDraggingRef.current = false;
       // Keep dragAnchorRef for potential shift-click extension
     }, []);
 
