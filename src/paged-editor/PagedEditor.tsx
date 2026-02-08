@@ -317,8 +317,8 @@ function resolveTableWidthPx(
 }
 
 function measureTableBlock(tableBlock: TableBlock, contentWidth: number): TableMeasure {
-  const TABLE_CELL_PADDING_Y = Math.round((108 / 20) * 1.333);
-  const TABLE_CELL_PADDING_X = Math.round((108 / 20) * 1.333);
+  const DEFAULT_CELL_PADDING_X = 7; // Word default: 108 twips ≈ 7px
+  const DEFAULT_CELL_PADDING_Y = 0; // Word default: 0 twips
   const TABLE_MIN_ROW_HEIGHT = 24;
 
   // columnWidths are already in pixels (converted in toFlowBlocks)
@@ -356,7 +356,9 @@ function measureTableBlock(tableBlock: TableBlock, contentWidth: number): TableM
         }
         columnIndex += colSpan;
 
-        const cellContentWidth = Math.max(1, cellWidth - TABLE_CELL_PADDING_X * 2);
+        const padLeft = cell.padding?.left ?? DEFAULT_CELL_PADDING_X;
+        const padRight = cell.padding?.right ?? DEFAULT_CELL_PADDING_X;
+        const cellContentWidth = Math.max(1, cellWidth - padLeft - padRight);
         return {
           blocks: cell.blocks.map((b) => measureBlock(b, cellContentWidth)),
           width: cellWidth,
@@ -372,14 +374,19 @@ function measureTableBlock(tableBlock: TableBlock, contentWidth: number): TableM
   // Calculate cell heights, respecting explicit row height rules
   for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
     const row = rows[rowIdx];
+    const sourceRowCells = tableBlock.rows[rowIdx]?.cells;
     let maxHeight = 0;
-    for (const cell of row.cells) {
+    for (let cellIdx = 0; cellIdx < row.cells.length; cellIdx++) {
+      const cell = row.cells[cellIdx];
+      const sourceCell = sourceRowCells?.[cellIdx];
       cell.height = cell.blocks.reduce((h, m) => {
         // Get height from any measure type (paragraph or table)
         if ('totalHeight' in m) return h + m.totalHeight;
         return h;
       }, 0);
-      cell.height += TABLE_CELL_PADDING_Y * 2;
+      const padTop = sourceCell?.padding?.top ?? DEFAULT_CELL_PADDING_Y;
+      const padBottom = sourceCell?.padding?.bottom ?? DEFAULT_CELL_PADDING_Y;
+      cell.height += padTop + padBottom;
       maxHeight = Math.max(maxHeight, cell.height);
     }
 
@@ -623,48 +630,39 @@ function measureBlocks(blocks: FlowBlock[], contentWidth: number): Measure[] {
   // Pre-extract floating image exclusion zones with anchor block indices
   const floatingZonesWithAnchors = extractFloatingZones(blocks, contentWidth);
 
-  // Find the anchor block indices where paragraph-relative floating zones become active
-  const anchorIndices = new Set(
-    floatingZonesWithAnchors.filter((z) => !z.isMarginRelative).map((z) => z.anchorBlockIndex)
-  );
+  // Find all anchor block indices where floating zones become active.
+  // Both margin-relative and paragraph-relative zones activate from their anchor block.
+  // Margin-relative zones (positioned relative to page/margin) only affect the page
+  // where they're anchored, not earlier pages.
+  const anchorIndices = new Set(floatingZonesWithAnchors.map((z) => z.anchorBlockIndex));
 
-  // Separate margin-relative zones (apply globally) from paragraph-relative zones
-  const marginRelativeZones: FloatingImageZone[] = floatingZonesWithAnchors
-    .filter((z) => z.isMarginRelative)
-    .map((z) => ({
+  // Group zones by anchor block index so they activate at the right point
+  const zonesByAnchor = new Map<number, FloatingImageZone[]>();
+  for (const z of floatingZonesWithAnchors) {
+    const existing = zonesByAnchor.get(z.anchorBlockIndex) ?? [];
+    existing.push({
       leftMargin: z.leftMargin,
       rightMargin: z.rightMargin,
       topY: z.topY,
       bottomY: z.bottomY,
-    }));
-
-  const paragraphRelativeZones: FloatingImageZone[] = floatingZonesWithAnchors
-    .filter((z) => !z.isMarginRelative)
-    .map((z) => ({
-      leftMargin: z.leftMargin,
-      rightMargin: z.rightMargin,
-      topY: z.topY,
-      bottomY: z.bottomY,
-    }));
+    });
+    zonesByAnchor.set(z.anchorBlockIndex, existing);
+  }
 
   // Track cumulative Y position for floating zone overlap calculation
-  // This resets when we reach a block with page-level floating images
+  // This resets when we reach a block with floating images
   let cumulativeY = 0;
-  let paragraphZonesActive = false;
+  let activeZones: FloatingImageZone[] = [];
 
   return blocks.map((block, blockIndex) => {
-    // Check if this block is an anchor for paragraph-relative floating images
-    // If so, reset cumulative Y so zones apply from this point
+    // Check if this block is an anchor for floating images
+    // If so, reset cumulative Y and activate those zones
     if (anchorIndices.has(blockIndex)) {
       cumulativeY = 0;
-      paragraphZonesActive = true;
+      const newZones = zonesByAnchor.get(blockIndex) ?? [];
+      activeZones = [...activeZones, ...newZones];
     }
 
-    // Margin-relative zones always apply; paragraph-relative only after anchor
-    const activeZones = [
-      ...marginRelativeZones,
-      ...(paragraphZonesActive ? paragraphRelativeZones : []),
-    ];
     const zones = activeZones.length > 0 ? activeZones : undefined;
 
     try {

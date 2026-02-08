@@ -234,7 +234,12 @@ function renderTableCell(
   cellEl.style.height = `${rowHeight}px`;
   cellEl.style.overflow = 'hidden';
   cellEl.style.boxSizing = 'border-box';
-  cellEl.style.padding = '7px 7px';
+  // Use per-cell padding from DOCX margins, default to Word's default (0 top/bottom, 7px left/right)
+  const padTop = cell.padding?.top ?? 0;
+  const padRight = cell.padding?.right ?? 7;
+  const padBottom = cell.padding?.bottom ?? 0;
+  const padLeft = cell.padding?.left ?? 7;
+  cellEl.style.padding = `${padTop}px ${padRight}px ${padBottom}px ${padLeft}px`;
 
   // Apply borders - use cell borders if available, otherwise no border
   if (cell.borders) {

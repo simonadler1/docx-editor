@@ -627,6 +627,19 @@ function convertTableCell(node: PMNode, startPos: number, options: ToFlowBlocksO
   });
 
   const attrs = node.attrs;
+
+  // Convert cell margins (twips) to pixel padding
+  // Word default: 0 top/bottom, 108 twips (~7px) left/right
+  const margins = attrs.margins as
+    | { top?: number; bottom?: number; left?: number; right?: number }
+    | undefined;
+  const padding = {
+    top: margins?.top != null ? twipsToPixels(margins.top) : 0,
+    right: margins?.right != null ? twipsToPixels(margins.right) : 7,
+    bottom: margins?.bottom != null ? twipsToPixels(margins.bottom) : 0,
+    left: margins?.left != null ? twipsToPixels(margins.left) : 7,
+  };
+
   return {
     id: nextBlockId(),
     blocks,
@@ -636,6 +649,7 @@ function convertTableCell(node: PMNode, startPos: number, options: ToFlowBlocksO
     verticalAlign: attrs.verticalAlign as 'top' | 'center' | 'bottom' | undefined,
     background: attrs.backgroundColor ? `#${attrs.backgroundColor}` : undefined,
     borders: extractCellBorders(attrs as Record<string, unknown>),
+    padding,
   };
 }
 

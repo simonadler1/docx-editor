@@ -266,6 +266,8 @@ export type TableCell = {
   verticalAlign?: 'top' | 'center' | 'bottom';
   background?: string;
   borders?: CellBorders;
+  /** Per-cell padding in pixels (from w:tcMar or table-level w:tblCellMar) */
+  padding?: { top: number; right: number; bottom: number; left: number };
 };
 
 /**
