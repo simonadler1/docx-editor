@@ -151,7 +151,11 @@ export function layoutDocument(
         break;
 
       case 'table':
-        layoutTable(block, measure as TableMeasure, paginator);
+        if (block.floating) {
+          layoutFloatingTable(block, measure as TableMeasure, paginator, contentWidth);
+        } else {
+          layoutTable(block, measure as TableMeasure, paginator);
+        }
         break;
 
       case 'image':
@@ -370,6 +374,104 @@ function layoutTable(
       paginator.ensureFits(rows[currentRowIndex].height);
     }
   }
+}
+
+/**
+ * Layout a floating table (anchored) without advancing the cursor.
+ */
+function layoutFloatingTable(
+  block: TableBlock,
+  measure: TableMeasure,
+  paginator: ReturnType<typeof createPaginator>,
+  contentWidth: number
+): void {
+  if (measure.kind !== 'table') {
+    throw new Error(`layoutFloatingTable: expected table measure`);
+  }
+
+  const state = paginator.getCurrentState();
+  const floating = block.floating;
+  const page = state.page;
+  const margins = page.margins;
+
+  const tableWidth = measure.totalWidth;
+  const tableHeight = measure.totalHeight;
+
+  const contentHeight = page.size.h - margins.top - margins.bottom;
+
+  // Default anchor base (content area)
+  let baseX = margins.left;
+  let baseY = margins.top;
+
+  if (floating?.horzAnchor === 'page') baseX = 0;
+  if (floating?.vertAnchor === 'page') baseY = 0;
+
+  // Determine X position
+  let x = paginator.getColumnX(state.columnIndex);
+  if (floating?.tblpX !== undefined) {
+    x = baseX + floating.tblpX;
+  } else if (floating?.tblpXSpec) {
+    const spec = floating.tblpXSpec;
+    if (spec === 'left' || spec === 'inside') {
+      x = baseX;
+    } else if (spec === 'right' || spec === 'outside') {
+      x = baseX + contentWidth - tableWidth;
+    } else if (spec === 'center') {
+      x = baseX + (contentWidth - tableWidth) / 2;
+    }
+  } else if (block.justification === 'center') {
+    x = baseX + (contentWidth - tableWidth) / 2;
+  } else if (block.justification === 'right') {
+    x = baseX + contentWidth - tableWidth;
+  }
+
+  // Determine Y position
+  let y = state.cursorY;
+  let usedExplicitY = false;
+  if (floating?.tblpY !== undefined) {
+    y = baseY + floating.tblpY;
+    usedExplicitY = true;
+  } else if (floating?.tblpYSpec) {
+    usedExplicitY = true;
+    const spec = floating.tblpYSpec;
+    if (spec === 'top') {
+      y = baseY;
+    } else if (spec === 'bottom') {
+      y = baseY + contentHeight - tableHeight;
+    } else if (spec === 'center') {
+      y = baseY + (contentHeight - tableHeight) / 2;
+    }
+  }
+
+  // If not explicitly positioned, ensure it fits on the current page
+  if (!usedExplicitY) {
+    const fitState = paginator.ensureFits(tableHeight);
+    y = fitState.cursorY;
+  }
+
+  // Clamp within content area to avoid negative positions
+  const minX = margins.left;
+  const maxX = margins.left + contentWidth - tableWidth;
+  if (Number.isFinite(maxX)) {
+    x = Math.max(minX, Math.min(x, maxX));
+  }
+
+  const fragment: TableFragment = {
+    kind: 'table',
+    blockId: block.id,
+    x,
+    y,
+    width: tableWidth,
+    height: tableHeight,
+    fromRow: 0,
+    toRow: block.rows.length,
+    pmStart: block.pmStart,
+    pmEnd: block.pmEnd,
+    isFloating: true,
+  };
+
+  // Add directly without advancing cursor
+  state.page.fragments.push(fragment);
 }
 
 /**

@@ -280,6 +280,22 @@ export type TableRow = {
 };
 
 /**
+ * Floating table positioning info (pixel values).
+ */
+export type FloatingTablePosition = {
+  horzAnchor?: 'margin' | 'page' | 'text';
+  vertAnchor?: 'margin' | 'page' | 'text';
+  tblpX?: number;
+  tblpXSpec?: 'left' | 'center' | 'right' | 'inside' | 'outside';
+  tblpY?: number;
+  tblpYSpec?: 'top' | 'center' | 'bottom' | 'inside' | 'outside' | 'inline';
+  topFromText?: number;
+  bottomFromText?: number;
+  leftFromText?: number;
+  rightFromText?: number;
+};
+
+/**
  * A table block containing rows.
  */
 export type TableBlock = {
@@ -287,8 +303,14 @@ export type TableBlock = {
   id: BlockId;
   rows: TableRow[];
   columnWidths?: number[];
+  /** Table width value (twips for dxa, 50ths of percent for pct). */
+  width?: number;
+  /** Table width type ('auto', 'pct', 'dxa', 'nil'). */
+  widthType?: string;
   /** Table horizontal alignment */
   justification?: 'left' | 'center' | 'right';
+  /** Floating table properties (pixel values). */
+  floating?: FloatingTablePosition;
   pmStart?: number;
   pmEnd?: number;
 };
@@ -520,6 +542,8 @@ export type TableFragment = FragmentBase & {
   toRow: number;
   /** Height of this fragment. */
   height: number;
+  /** True if this is a floating table. */
+  isFloating?: boolean;
   /** True if this continues from a previous page. */
   continuesFromPrev?: boolean;
   /** True if this continues onto the next page. */

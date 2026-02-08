@@ -41,6 +41,7 @@ import type {
   Measure,
   ParagraphBlock,
   TableBlock,
+  TableMeasure,
   ImageBlock,
   ImageRun,
   PageMargins,
@@ -299,6 +300,115 @@ function emuToPixels(emu: number | undefined): number {
   return Math.round((emu * 96) / 914400);
 }
 
+function resolveTableWidthPx(
+  width: number | undefined,
+  widthType: string | undefined,
+  contentWidth: number
+): number | undefined {
+  if (!width) return undefined;
+  if (widthType === 'pct') {
+    // width is in 50ths of a percent (5000 = 100%)
+    return (contentWidth * width) / 5000;
+  }
+  if (widthType === 'dxa' || !widthType || widthType === 'auto') {
+    return Math.round((width / 20) * 1.333);
+  }
+  return undefined;
+}
+
+function measureTableBlock(tableBlock: TableBlock, contentWidth: number): TableMeasure {
+  const TABLE_CELL_PADDING_Y = Math.round((108 / 20) * 1.333);
+  const TABLE_CELL_PADDING_X = Math.round((108 / 20) * 1.333);
+  const TABLE_MIN_ROW_HEIGHT = 24;
+
+  // columnWidths are already in pixels (converted in toFlowBlocks)
+  let columnWidths = tableBlock.columnWidths ?? [];
+  const explicitWidthPx = resolveTableWidthPx(tableBlock.width, tableBlock.widthType, contentWidth);
+
+  if (columnWidths.length === 0 && tableBlock.rows.length > 0) {
+    // Determine total columns from first row's colSpans
+    const colCount = tableBlock.rows[0].cells.reduce((sum, cell) => sum + (cell.colSpan ?? 1), 0);
+    const totalWidth = explicitWidthPx ?? contentWidth;
+    const equalWidth = totalWidth / Math.max(1, colCount);
+    columnWidths = Array(colCount).fill(equalWidth);
+  } else if (columnWidths.length > 0 && explicitWidthPx) {
+    const totalWidth = columnWidths.reduce((sum, w) => sum + w, 0);
+    if (totalWidth > 0 && Math.abs(totalWidth - explicitWidthPx) > 1) {
+      const scale = explicitWidthPx / totalWidth;
+      columnWidths = columnWidths.map((w) => w * scale);
+    }
+  }
+
+  // Calculate cell widths based on colSpan and columnWidths
+  const rows = tableBlock.rows.map((row) => {
+    let columnIndex = 0;
+    return {
+      cells: row.cells.map((cell) => {
+        const colSpan = cell.colSpan ?? 1;
+        // Calculate cell width as sum of spanned columns
+        let cellWidth = 0;
+        for (let c = 0; c < colSpan && columnIndex + c < columnWidths.length; c++) {
+          cellWidth += columnWidths[columnIndex + c] ?? 0;
+        }
+        // Fallback to cell.width or default if columnWidths not available
+        if (cellWidth === 0) {
+          cellWidth = cell.width ?? 100;
+        }
+        columnIndex += colSpan;
+
+        const cellContentWidth = Math.max(1, cellWidth - TABLE_CELL_PADDING_X * 2);
+        return {
+          blocks: cell.blocks.map((b) => measureBlock(b, cellContentWidth)),
+          width: cellWidth,
+          height: 0, // Calculated below
+          colSpan: cell.colSpan,
+          rowSpan: cell.rowSpan,
+        };
+      }),
+      height: 0,
+    };
+  });
+
+  // Calculate cell heights, respecting explicit row height rules
+  for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    const row = rows[rowIdx];
+    let maxHeight = 0;
+    for (const cell of row.cells) {
+      cell.height = cell.blocks.reduce((h, m) => {
+        // Get height from any measure type (paragraph or table)
+        if ('totalHeight' in m) return h + m.totalHeight;
+        return h;
+      }, 0);
+      cell.height += TABLE_CELL_PADDING_Y * 2;
+      maxHeight = Math.max(maxHeight, cell.height);
+    }
+
+    // Apply heightRule from the source row
+    const sourceRow = tableBlock.rows[rowIdx];
+    const explicitHeight = sourceRow?.height;
+    const heightRule = sourceRow?.heightRule;
+
+    if (explicitHeight && heightRule === 'exact') {
+      row.height = explicitHeight;
+    } else if (explicitHeight && heightRule === 'atLeast') {
+      row.height = Math.max(maxHeight, explicitHeight);
+    } else {
+      row.height = Math.max(maxHeight, TABLE_MIN_ROW_HEIGHT);
+    }
+  }
+
+  const totalHeight = rows.reduce((h, r) => h + r.height, 0);
+  const totalWidth = columnWidths.reduce((w, cw) => w + cw, 0) || explicitWidthPx || contentWidth;
+
+  return {
+    kind: 'table',
+    rows,
+    columnWidths,
+    totalWidth,
+    totalHeight,
+  };
+}
+
 /**
  * Extract floating image exclusion zones from all blocks.
  * Called before measurement to determine line width reductions.
@@ -388,6 +498,63 @@ function extractFloatingZones(blocks: FlowBlock[], contentWidth: number): Floati
     }
   }
 
+  // Floating tables (block-level) - treat them as exclusion zones for subsequent text
+  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+    const block = blocks[blockIndex];
+    if (block.kind !== 'table') continue;
+
+    const tableBlock = block as TableBlock;
+    const floating = tableBlock.floating;
+    if (!floating) continue;
+
+    const tableMeasure = measureTableBlock(tableBlock, contentWidth);
+    const tableWidth = tableMeasure.totalWidth;
+    const tableHeight = tableMeasure.totalHeight;
+
+    const distLeft = floating.leftFromText ?? 12;
+    const distRight = floating.rightFromText ?? 12;
+    const distTop = floating.topFromText ?? 0;
+    const distBottom = floating.bottomFromText ?? 0;
+
+    let leftMargin = 0;
+    let rightMargin = 0;
+
+    // Determine horizontal position relative to content area
+    let x = 0;
+    if (floating.tblpX !== undefined) {
+      x = floating.tblpX;
+    } else if (floating.tblpXSpec) {
+      if (floating.tblpXSpec === 'left' || floating.tblpXSpec === 'inside') {
+        x = 0;
+      } else if (floating.tblpXSpec === 'right' || floating.tblpXSpec === 'outside') {
+        x = contentWidth - tableWidth;
+      } else if (floating.tblpXSpec === 'center') {
+        x = (contentWidth - tableWidth) / 2;
+      }
+    } else if (tableBlock.justification === 'center') {
+      x = (contentWidth - tableWidth) / 2;
+    } else if (tableBlock.justification === 'right') {
+      x = contentWidth - tableWidth;
+    }
+
+    if (x < contentWidth / 2) {
+      leftMargin = x + tableWidth + distRight;
+    } else {
+      rightMargin = contentWidth - x + distLeft;
+    }
+
+    const topY = floating.tblpY ?? 0;
+    const bottomY = topY + tableHeight;
+
+    zones.push({
+      leftMargin,
+      rightMargin,
+      topY: topY - distTop,
+      bottomY: bottomY + distBottom,
+      anchorBlockIndex: blockIndex,
+    });
+  }
+
   return zones;
 }
 
@@ -408,86 +575,7 @@ function measureBlock(
       });
 
     case 'table': {
-      const TABLE_CELL_PADDING_Y = 6;
-      const TABLE_MIN_ROW_HEIGHT = 24;
-      // Simple table measure - calculate dimensions with proper column handling
-      const tableBlock = block as TableBlock;
-      // columnWidths are already in pixels (converted in toFlowBlocks)
-      // If missing, compute equal widths from content width and column count
-      let columnWidths = tableBlock.columnWidths ?? [];
-      if (columnWidths.length === 0 && tableBlock.rows.length > 0) {
-        const colCount = tableBlock.rows[0].cells.length;
-        const equalWidth = contentWidth / colCount;
-        columnWidths = Array(colCount).fill(equalWidth);
-      }
-
-      // Calculate cell widths based on colSpan and columnWidths
-      const rows = tableBlock.rows.map((row) => {
-        let columnIndex = 0;
-        return {
-          cells: row.cells.map((cell) => {
-            const colSpan = cell.colSpan ?? 1;
-            // Calculate cell width as sum of spanned columns
-            let cellWidth = 0;
-            for (let c = 0; c < colSpan && columnIndex + c < columnWidths.length; c++) {
-              cellWidth += columnWidths[columnIndex + c] ?? 0;
-            }
-            // Fallback to cell.width or default if columnWidths not available
-            if (cellWidth === 0) {
-              cellWidth = cell.width ?? 100;
-            }
-            columnIndex += colSpan;
-
-            return {
-              blocks: cell.blocks.map((b) => measureBlock(b, cellWidth)),
-              width: cellWidth,
-              height: 0, // Calculated below
-              colSpan: cell.colSpan,
-              rowSpan: cell.rowSpan,
-            };
-          }),
-          height: 0,
-        };
-      });
-
-      // Calculate cell heights, respecting explicit row height rules
-      for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-        const row = rows[rowIdx];
-        let maxHeight = 0;
-        for (const cell of row.cells) {
-          cell.height = cell.blocks.reduce((h, m) => {
-            // Get height from any measure type (paragraph or table)
-            if ('totalHeight' in m) return h + m.totalHeight;
-            return h;
-          }, 0);
-          cell.height += TABLE_CELL_PADDING_Y * 2;
-          maxHeight = Math.max(maxHeight, cell.height);
-        }
-
-        // Apply heightRule from the source row
-        const sourceRow = tableBlock.rows[rowIdx];
-        const explicitHeight = sourceRow?.height;
-        const heightRule = sourceRow?.heightRule;
-
-        if (explicitHeight && heightRule === 'exact') {
-          row.height = explicitHeight;
-        } else if (explicitHeight && heightRule === 'atLeast') {
-          row.height = Math.max(maxHeight, explicitHeight);
-        } else {
-          row.height = Math.max(maxHeight, TABLE_MIN_ROW_HEIGHT);
-        }
-      }
-
-      const totalHeight = rows.reduce((h, r) => h + r.height, 0);
-      const totalWidth = columnWidths.reduce((w, cw) => w + cw, 0);
-
-      return {
-        kind: 'table',
-        rows,
-        columnWidths,
-        totalWidth: totalWidth || contentWidth,
-        totalHeight,
-      };
+      return measureTableBlock(block as TableBlock, contentWidth);
     }
 
     case 'image': {
@@ -568,7 +656,9 @@ function measureBlocks(blocks: FlowBlock[], contentWidth: number): Measure[] {
 
       // Update cumulative Y for next block
       if ('totalHeight' in measure) {
-        cumulativeY += measure.totalHeight;
+        if (!(block.kind === 'table' && (block as TableBlock).floating)) {
+          cumulativeY += measure.totalHeight;
+        }
       }
 
       return measure;
@@ -1506,6 +1596,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
     const handlePagesMouseDown = useCallback(
       (e: React.MouseEvent) => {
         if (!hiddenPMRef.current || e.button !== 0) return; // Only handle left click
+        if (readOnly) return;
 
         // Column resize: intercept clicks on resize handles
         const target = e.target as HTMLElement;
@@ -1665,7 +1756,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
         hiddenPMRef.current.focus();
         setIsFocused(true);
       },
-      [getPositionFromMouse, findCellPosFromPmPos]
+      [getPositionFromMouse, findCellPosFromPmPos, readOnly]
     );
 
     /**
@@ -2035,9 +2126,10 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
      * Handle focus on container - redirect to hidden PM.
      */
     const handleContainerFocus = useCallback(() => {
+      if (readOnly) return;
       hiddenPMRef.current?.focus();
       setIsFocused(true);
-    }, []);
+    }, [readOnly]);
 
     /**
      * Handle blur from container.
@@ -2056,57 +2148,62 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
      * Most keyboard handling is done by ProseMirror, but we intercept
      * specific keys for navigation and ensure focus stays on hidden PM.
      */
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-      // Ensure hidden PM is focused if user types
-      if (!hiddenPMRef.current?.isFocused()) {
-        hiddenPMRef.current?.focus();
-        setIsFocused(true);
-      }
-
-      // Prevent space from scrolling the container - let PM handle it as text input
-      if (e.key === ' ' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        // Forward to hidden PM by dispatching a native event
-        const view = hiddenPMRef.current?.getView();
-        if (view) {
-          // Insert space text via PM transaction
-          const { state, dispatch } = view;
-          dispatch(state.tr.insertText(' '));
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (readOnly) return;
+        // Ensure hidden PM is focused if user types
+        if (!hiddenPMRef.current?.isFocused()) {
+          hiddenPMRef.current?.focus();
+          setIsFocused(true);
         }
-        return;
-      }
 
-      // PageUp/PageDown - let container handle scrolling
-      if (['PageUp', 'PageDown'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
-        // Let PM handle the cursor movement first
-        // If PM doesn't handle it (at bounds), the container will scroll
-      }
-
-      // Cmd/Ctrl+Home - scroll to top and move cursor to start
-      if (e.key === 'Home' && (e.metaKey || e.ctrlKey)) {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = 0;
+        // Prevent space from scrolling the container - let PM handle it as text input
+        if (e.key === ' ' && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          // Forward to hidden PM by dispatching a native event
+          const view = hiddenPMRef.current?.getView();
+          if (view) {
+            // Insert space text via PM transaction
+            const { state, dispatch } = view;
+            dispatch(state.tr.insertText(' '));
+          }
+          return;
         }
-      }
 
-      // Cmd/Ctrl+End - scroll to bottom and move cursor to end
-      if (e.key === 'End' && (e.metaKey || e.ctrlKey)) {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        // PageUp/PageDown - let container handle scrolling
+        if (['PageUp', 'PageDown'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+          // Let PM handle the cursor movement first
+          // If PM doesn't handle it (at bounds), the container will scroll
         }
-      }
-    }, []);
+
+        // Cmd/Ctrl+Home - scroll to top and move cursor to start
+        if (e.key === 'Home' && (e.metaKey || e.ctrlKey)) {
+          if (containerRef.current) {
+            containerRef.current.scrollTop = 0;
+          }
+        }
+
+        // Cmd/Ctrl+End - scroll to bottom and move cursor to end
+        if (e.key === 'End' && (e.metaKey || e.ctrlKey)) {
+          if (containerRef.current) {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+          }
+        }
+      },
+      [readOnly]
+    );
 
     /**
      * Handle mousedown on container (outside pages).
      */
     const handleContainerMouseDown = useCallback(() => {
+      if (readOnly) return;
       // Focus hidden PM if clicking outside pages area
       if (!hiddenPMRef.current?.isFocused()) {
         hiddenPMRef.current?.focus();
         setIsFocused(true);
       }
-    }, []);
+    }, [readOnly]);
 
     // =========================================================================
     // Initial Layout
@@ -2331,6 +2428,7 @@ const PagedEditorComponent = forwardRef<PagedEditorRef, PagedEditorProps>(
             caretPosition={caretPosition}
             isFocused={isFocused}
             pageGap={pageGap}
+            readOnly={readOnly}
           />
 
           {/* Plugin overlays (highlights, annotations) */}

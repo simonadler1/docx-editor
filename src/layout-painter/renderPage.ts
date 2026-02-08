@@ -54,6 +54,26 @@ interface PageFloatingImage {
 }
 
 /**
+ * Floating object exclusion rectangle used for text wrapping.
+ */
+interface FloatingExclusionRect {
+  /** Which side: 'left' for left margin, 'right' for right margin */
+  side: 'left' | 'right';
+  /** X position relative to content area (0 = left edge of content) */
+  x: number;
+  /** Y position relative to content area (0 = top of content) */
+  y: number;
+  /** Object dimensions */
+  width: number;
+  height: number;
+  /** Wrap distances */
+  distTop: number;
+  distBottom: number;
+  distLeft: number;
+  distRight: number;
+}
+
+/**
  * CSS class names for page elements
  */
 export const PAGE_CLASS_NAMES = {
@@ -341,7 +361,7 @@ function extractFloatingImagesFromParagraph(
  * Used to determine which paragraphs need margin adjustments.
  */
 function calculateExclusionZones(
-  floatingImages: PageFloatingImage[],
+  rects: FloatingExclusionRect[],
   contentWidth: number
 ): FloatingImageInfo[] {
   const result: FloatingImageInfo[] = [];
@@ -352,20 +372,20 @@ function calculateExclusionZones(
   let topBound = Infinity;
   let bottomBound = 0;
 
-  for (const img of floatingImages) {
-    const imgLeft = img.x - img.distLeft;
-    const imgRight = img.x + img.width + img.distRight;
-    const imgTop = img.y - img.distTop;
-    const imgBottom = img.y + img.height + img.distBottom;
+  for (const rect of rects) {
+    const rectLeft = rect.x - rect.distLeft;
+    const rectRight = rect.x + rect.width + rect.distRight;
+    const rectTop = rect.y - rect.distTop;
+    const rectBottom = rect.y + rect.height + rect.distBottom;
 
-    if (img.side === 'left') {
-      leftExtent = Math.max(leftExtent, imgRight);
+    if (rect.side === 'left') {
+      leftExtent = Math.max(leftExtent, rectRight);
     } else {
-      rightExtent = Math.max(rightExtent, contentWidth - imgLeft);
+      rightExtent = Math.max(rightExtent, contentWidth - rectLeft);
     }
 
-    topBound = Math.min(topBound, imgTop);
-    bottomBound = Math.max(bottomBound, imgBottom);
+    topBound = Math.min(topBound, rectTop);
+    bottomBound = Math.max(bottomBound, rectBottom);
   }
 
   // Create a single exclusion zone that covers all floating images
@@ -612,6 +632,7 @@ export function renderPage(
 
   // PHASE 1: Extract all floating images from paragraphs on this page
   const allFloatingImages: PageFloatingImage[] = [];
+  const floatingRects: FloatingExclusionRect[] = [];
 
   for (const fragment of page.fragments) {
     if (fragment.kind === 'paragraph' && options.blockLookup) {
@@ -630,8 +651,57 @@ export function renderPage(
     }
   }
 
-  // PHASE 2: Calculate exclusion zones from all floating images
-  const exclusionZones = calculateExclusionZones(allFloatingImages, contentWidth);
+  // Collect floating image exclusion rectangles
+  for (const img of allFloatingImages) {
+    floatingRects.push({
+      side: img.side,
+      x: img.x,
+      y: img.y,
+      width: img.width,
+      height: img.height,
+      distTop: img.distTop,
+      distBottom: img.distBottom,
+      distLeft: img.distLeft,
+      distRight: img.distRight,
+    });
+  }
+
+  // Collect floating table exclusion rectangles
+  if (options.blockLookup) {
+    for (const fragment of page.fragments) {
+      if (fragment.kind !== 'table') continue;
+      const blockData = options.blockLookup.get(String(fragment.blockId));
+      if (blockData?.block.kind !== 'table') continue;
+      const tableBlock = blockData.block as TableBlock;
+      const floating = tableBlock.floating;
+      if (!floating) continue;
+
+      const contentX = fragment.x - page.margins.left;
+      const contentY = fragment.y - page.margins.top;
+
+      const distTop = floating.topFromText ?? 0;
+      const distBottom = floating.bottomFromText ?? 0;
+      const distLeft = floating.leftFromText ?? 12;
+      const distRight = floating.rightFromText ?? 12;
+
+      const side = contentX < contentWidth / 2 ? 'left' : 'right';
+
+      floatingRects.push({
+        side,
+        x: contentX,
+        y: contentY,
+        width: fragment.width,
+        height: fragment.height,
+        distTop,
+        distBottom,
+        distLeft,
+        distRight,
+      });
+    }
+  }
+
+  // PHASE 2: Calculate exclusion zones from floating objects
+  const exclusionZones = calculateExclusionZones(floatingRects, contentWidth);
 
   // PHASE 3: Render floating images in a page-level layer
   if (allFloatingImages.length > 0) {

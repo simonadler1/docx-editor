@@ -225,7 +225,7 @@ function renderTableCell(
   cellEl.style.height = `${rowHeight}px`;
   cellEl.style.overflow = 'hidden';
   cellEl.style.boxSizing = 'border-box';
-  cellEl.style.padding = '6px 8px';
+  cellEl.style.padding = '7px 7px';
 
   // Apply borders - use cell borders if available, otherwise no border
   if (cell.borders) {

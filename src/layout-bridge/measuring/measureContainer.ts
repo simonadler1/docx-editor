@@ -219,6 +219,11 @@ export function measureTextWidth(text: string, style: FontStyle): number {
     width += style.letterSpacing * (text.length - 1);
   }
 
+  // Word tends to wrap slightly earlier; add a tiny per-character fudge.
+  if (text.length > 1) {
+    width += (text.length - 1) * 0.15;
+  }
+
   return width;
 }
 

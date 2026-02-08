@@ -667,6 +667,9 @@ function convertTable(node: PMNode, startPos: number, options: ToFlowBlocksOptio
   const columnWidthsTwips = node.attrs.columnWidths as number[] | undefined;
   let columnWidths = columnWidthsTwips?.map(twipsToPixels);
 
+  const width = node.attrs.width as number | undefined;
+  const widthType = node.attrs.widthType as string | undefined;
+
   // Fallback: compute column widths from first row cell widths if table attr is missing
   if (!columnWidths && rows.length > 0) {
     const firstRow = rows[0];
@@ -680,12 +683,51 @@ function convertTable(node: PMNode, startPos: number, options: ToFlowBlocksOptio
   // Extract justification
   const justification = node.attrs.justification as 'left' | 'center' | 'right' | undefined;
 
+  const floating = node.attrs.floating as
+    | {
+        horzAnchor?: 'margin' | 'page' | 'text';
+        vertAnchor?: 'margin' | 'page' | 'text';
+        tblpX?: number;
+        tblpXSpec?: 'left' | 'center' | 'right' | 'inside' | 'outside';
+        tblpY?: number;
+        tblpYSpec?: 'top' | 'center' | 'bottom' | 'inside' | 'outside' | 'inline';
+        topFromText?: number;
+        bottomFromText?: number;
+        leftFromText?: number;
+        rightFromText?: number;
+      }
+    | undefined;
+
+  const floatingPx = floating
+    ? {
+        horzAnchor: floating.horzAnchor,
+        vertAnchor: floating.vertAnchor,
+        tblpX: floating.tblpX !== undefined ? twipsToPixels(floating.tblpX) : undefined,
+        tblpXSpec: floating.tblpXSpec,
+        tblpY: floating.tblpY !== undefined ? twipsToPixels(floating.tblpY) : undefined,
+        tblpYSpec: floating.tblpYSpec,
+        topFromText:
+          floating.topFromText !== undefined ? twipsToPixels(floating.topFromText) : undefined,
+        bottomFromText:
+          floating.bottomFromText !== undefined
+            ? twipsToPixels(floating.bottomFromText)
+            : undefined,
+        leftFromText:
+          floating.leftFromText !== undefined ? twipsToPixels(floating.leftFromText) : undefined,
+        rightFromText:
+          floating.rightFromText !== undefined ? twipsToPixels(floating.rightFromText) : undefined,
+      }
+    : undefined;
+
   return {
     kind: 'table',
     id: nextBlockId(),
     rows,
     columnWidths,
+    width,
+    widthType,
     justification,
+    floating: floatingPx,
     pmStart: startPos,
     pmEnd: startPos + node.nodeSize,
   };

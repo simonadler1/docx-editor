@@ -557,6 +557,51 @@ export function measureParagraph(
         const word = text.slice(charIndex, nextBreak);
         const wordWidth = measureTextWidth(word, style);
 
+        // If the word itself is longer than a line, hard-break by characters.
+        if (wordWidth > currentLine.availableWidth + WIDTH_TOLERANCE) {
+          // Move to a new line if we already have content.
+          if (currentLine.width > 0) {
+            startNewLine(runIndex, charIndex);
+            updateMaxFont(style);
+          }
+
+          const { charWidths } = measureRun(word, style);
+          let chunkStart = 0;
+
+          while (chunkStart < word.length) {
+            let chunkWidth = 0;
+            let chunkEnd = chunkStart;
+
+            while (chunkEnd < word.length) {
+              const w = charWidths[chunkEnd] ?? 0;
+              if (chunkWidth + w > currentLine.availableWidth + WIDTH_TOLERANCE) {
+                break;
+              }
+              chunkWidth += w;
+              chunkEnd += 1;
+            }
+
+            // If a single character doesn't fit (very narrow width), force it.
+            if (chunkEnd === chunkStart) {
+              chunkEnd = Math.min(word.length, chunkStart + 1);
+              chunkWidth = charWidths[chunkStart] ?? 0;
+            }
+
+            currentLine.width += chunkWidth;
+            currentLine.toRun = runIndex;
+            currentLine.toChar = charIndex + chunkEnd;
+
+            chunkStart = chunkEnd;
+            if (chunkStart < word.length) {
+              startNewLine(runIndex, charIndex + chunkStart);
+              updateMaxFont(style);
+            }
+          }
+
+          charIndex = nextBreak;
+          continue;
+        }
+
         // Check if word fits on current line
         if (
           currentLine.width > 0 &&
