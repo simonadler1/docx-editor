@@ -531,7 +531,7 @@ function Router() {
   if (path === '/docxtemplater') {
     return (
       <BaseDemo
-        title="@eigenpal/docx-js-editor"
+        title="docx-editor.com"
         badge="Docxtemplater Plugin"
         withTemplatePlugin={true}
         initialDocument={createTemplateDocument()}
@@ -539,7 +539,7 @@ function Router() {
     );
   }
 
-  return <BaseDemo title="@eigenpal/docx-js-editor" />;
+  return <BaseDemo title="docx-editor.com" />;
 }
 
 // ============================================================================
