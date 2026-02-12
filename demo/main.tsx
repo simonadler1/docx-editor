@@ -374,15 +374,15 @@ function BaseDemo({ title, badge, withTemplatePlugin = false, initialDocument }:
   const [documentBuffer, setDocumentBuffer] = useState<ArrayBuffer | null>(null);
   const [fileName, setFileName] = useState<string>('Untitled.docx');
   const [status, setStatus] = useState<string>('');
-  const [currentPath, setCurrentPath] = useState(window.location.hash.slice(1) || '/');
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  // Listen for hash changes
+  // Listen for route changes
   useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentPath(window.location.hash.slice(1) || '/');
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Handle new document
@@ -469,11 +469,22 @@ function BaseDemo({ title, badge, withTemplatePlugin = false, initialDocument }:
         </div>
         <div style={styles.headerRight}>
           {/* Navigation */}
-          <a href="#/" style={currentPath === '/' ? styles.navLinkActive : styles.navLink}>
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+            style={currentPath === '/' ? styles.navLinkActive : styles.navLink}
+          >
             Editor
           </a>
           <a
-            href="#/about"
+            href="/about"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/about');
+            }}
             style={currentPath === '/about' ? styles.navLinkActive : styles.navLink}
           >
             About
@@ -522,15 +533,36 @@ function AboutPage() {
     <div style={styles.container}>
       <header style={styles.header}>
         <div style={styles.headerLeft}>
-          <a href="#/" style={styles.titleLink}>
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+            style={styles.titleLink}
+          >
             <h1 style={styles.title}>docx-editor.com</h1>
           </a>
         </div>
         <div style={styles.headerRight}>
-          <a href="#/" style={styles.navLink}>
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/');
+            }}
+            style={styles.navLink}
+          >
             Editor
           </a>
-          <a href="#/about" style={styles.navLinkActive}>
+          <a
+            href="/about"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/about');
+            }}
+            style={styles.navLinkActive}
+          >
             About
           </a>
         </div>
@@ -602,7 +634,11 @@ function AboutPage() {
 
           <div style={{ marginTop: '48px' }}>
             <a
-              href="#/"
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/');
+              }}
               style={{
                 display: 'inline-block',
                 padding: '10px 20px',
@@ -627,15 +663,20 @@ function AboutPage() {
 // ROUTER
 // ============================================================================
 
+function navigate(to: string) {
+  window.history.pushState(null, '', to);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 function Router() {
-  const [path, setPath] = useState(window.location.hash.slice(1) || '/');
+  const [path, setPath] = useState(window.location.pathname);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      setPath(window.location.hash.slice(1) || '/');
+    const handlePopState = () => {
+      setPath(window.location.pathname);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   if (path === '/about') {
