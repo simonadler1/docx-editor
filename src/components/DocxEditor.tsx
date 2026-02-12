@@ -320,7 +320,7 @@ export const DocxEditor = forwardRef<DocxEditorRef, DocxEditorProps>(function Do
     onFontsLoaded: onFontsLoadedCallback,
     theme,
     showToolbar = true,
-    showVariablePanel = true,
+    showVariablePanel = false,
     showZoomControl = true,
     showPageNumbers = true,
     enablePageNavigation = true,

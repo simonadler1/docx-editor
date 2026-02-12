@@ -478,6 +478,12 @@ function BaseDemo({ title, badge, withTemplatePlugin = false, initialDocument }:
           >
             Docxtemplater
           </a>
+          <a
+            href="#/about"
+            style={currentPath === '/about' ? styles.navLinkActive : styles.navLink}
+          >
+            About
+          </a>
           <span style={{ width: '1px', height: '20px', background: '#e2e8f0' }} />
           <label style={styles.fileInputLabel}>
             <input
@@ -514,6 +520,119 @@ function BaseDemo({ title, badge, withTemplatePlugin = false, initialDocument }:
 }
 
 // ============================================================================
+// ABOUT PAGE
+// ============================================================================
+
+function AboutPage() {
+  return (
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <div style={styles.headerLeft}>
+          <a href="#/" style={styles.titleLink}>
+            <h1 style={styles.title}>docx-editor.com</h1>
+          </a>
+        </div>
+        <div style={styles.headerRight}>
+          <a href="#/" style={styles.navLink}>
+            Editor
+          </a>
+          <a href="#/docxtemplater" style={styles.navLink}>
+            Docxtemplater
+          </a>
+          <a href="#/about" style={styles.navLinkActive}>
+            About
+          </a>
+        </div>
+      </header>
+
+      <main
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '60px 20px',
+        }}
+      >
+        <div style={{ maxWidth: '600px', width: '100%' }}>
+          <h2
+            style={{
+              fontSize: '32px',
+              fontWeight: 700,
+              color: '#0f172a',
+              marginBottom: '12px',
+              letterSpacing: '-0.025em',
+            }}
+          >
+            Edit DOCX files. No login required.
+          </h2>
+          <p style={{ fontSize: '17px', color: '#64748b', lineHeight: 1.7, marginBottom: '40px' }}>
+            docx-editor.com is a free, browser-based DOCX editor. Open a file, make your changes,
+            and download — that's it.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div>
+              <h3
+                style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}
+              >
+                100% local
+              </h3>
+              <p style={{ fontSize: '15px', color: '#64748b', lineHeight: 1.6 }}>
+                Your documents never leave your browser. Everything runs locally on your device — no
+                uploads, no servers, no cloud storage.
+              </p>
+            </div>
+
+            <div>
+              <h3
+                style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}
+              >
+                We don't save your data
+              </h3>
+              <p style={{ fontSize: '15px', color: '#64748b', lineHeight: 1.6 }}>
+                We have no database, no user accounts, and no analytics tracking your documents.
+                When you close the tab, your data is gone from our end — because it was never there.
+              </p>
+            </div>
+
+            <div>
+              <h3
+                style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}
+              >
+                No sign-up, no paywall
+              </h3>
+              <p style={{ fontSize: '15px', color: '#64748b', lineHeight: 1.6 }}>
+                Just open the site and start editing. No account creation, no email verification, no
+                trial period.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '48px' }}>
+            <a
+              href="#/"
+              style={{
+                display: 'inline-block',
+                padding: '10px 20px',
+                background: '#0f172a',
+                color: '#fff',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: 500,
+              }}
+            >
+              Open the editor
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ============================================================================
 // ROUTER
 // ============================================================================
 
@@ -527,6 +646,10 @@ function Router() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  if (path === '/about') {
+    return <AboutPage />;
+  }
 
   if (path === '/docxtemplater') {
     return (
