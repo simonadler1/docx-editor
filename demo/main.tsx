@@ -340,7 +340,7 @@ function EditorWrapper({
       onFontsLoaded={onFontsLoaded}
       showToolbar={true}
       showRuler={true}
-      showVariablePanel={!withTemplatePlugin}
+      showVariablePanel={false}
       showZoomControl={true}
       showPageNumbers={false}
       initialZoom={1.0}
@@ -473,12 +473,6 @@ function BaseDemo({ title, badge, withTemplatePlugin = false, initialDocument }:
             Editor
           </a>
           <a
-            href="#/docxtemplater"
-            style={currentPath === '/docxtemplater' ? styles.navLinkActive : styles.navLink}
-          >
-            Docxtemplater
-          </a>
-          <a
             href="#/about"
             style={currentPath === '/about' ? styles.navLinkActive : styles.navLink}
           >
@@ -535,9 +529,6 @@ function AboutPage() {
         <div style={styles.headerRight}>
           <a href="#/" style={styles.navLink}>
             Editor
-          </a>
-          <a href="#/docxtemplater" style={styles.navLink}>
-            Docxtemplater
           </a>
           <a href="#/about" style={styles.navLinkActive}>
             About
@@ -649,17 +640,6 @@ function Router() {
 
   if (path === '/about') {
     return <AboutPage />;
-  }
-
-  if (path === '/docxtemplater') {
-    return (
-      <BaseDemo
-        title="docx-editor.com"
-        badge="Docxtemplater Plugin"
-        withTemplatePlugin={true}
-        initialDocument={createTemplateDocument()}
-      />
-    );
   }
 
   return <BaseDemo title="docx-editor.com" />;
