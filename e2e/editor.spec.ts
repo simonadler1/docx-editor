@@ -86,16 +86,6 @@ test.describe('Editor Features', () => {
   });
 });
 
-test.describe('Template Variables', () => {
-  test.skip('detects and displays template variables', async ({ page }) => {
-    // Skip until variable detection is implemented
-  });
-
-  test.skip('can substitute variables with docxtemplater', async ({ page }) => {
-    // Skip until template processing is implemented
-  });
-});
-
 test.describe('Agent API', () => {
   test.skip('DocumentAgent can read document content', async ({ page }) => {
     // Skip until agent API is implemented

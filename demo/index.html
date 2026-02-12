@@ -3,7 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>docx-js-editor</title>
+  <title>docx-js-editor — Browser-Based DOCX Editor for React</title>
+  <meta name="description" content="Open-source WYSIWYG DOCX editor for React. Edit Word documents in the browser with full formatting support — bold, tables, images, styles, and template variables.">
+  <link rel="canonical" href="https://docx-editor.com/">
+  <meta name="theme-color" content="#4CAF50">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="apple-touch-icon" href="/assets/logo.png">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="docx-js-editor">
+  <meta property="og:title" content="docx-js-editor — Browser-Based DOCX Editor for React">
+  <meta property="og:description" content="Open-source WYSIWYG DOCX editor for React. Edit Word documents in the browser with full formatting support — bold, tables, images, styles, and template variables.">
+  <meta property="og:url" content="https://docx-editor.com/">
+  <meta property="og:image" content="https://docx-editor.com/assets/editor.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="docx-js-editor — Browser-Based DOCX Editor for React">
+  <meta name="twitter:description" content="Open-source WYSIWYG DOCX editor for React. Edit Word documents in the browser with full formatting, tables, images, and template variables.">
+  <meta name="twitter:image" content="https://docx-editor.com/assets/editor.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "docx-js-editor",
+    "description": "Open-source WYSIWYG DOCX editor for React. Edit Word documents in the browser with full formatting support.",
+    "url": "https://docx-editor.com/",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "softwareVersion": "0.0.7",
+    "author": {
+      "@type": "Organization",
+      "name": "EigenPal"
+    },
+    "license": "https://opensource.org/licenses/MIT"
+  }
+  </script>
 
   <!-- Preconnect to Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -81,6 +128,9 @@
   <div id="app">
     <div class="loading">Loading DOCX Editor...</div>
   </div>
+  <noscript>
+    <p>docx-js-editor is an open-source browser-based DOCX editor for React. Enable JavaScript to use the editor.</p>
+  </noscript>
   <script type="module" src="./main.tsx"></script>
 </body>
 </html>
