@@ -61,8 +61,8 @@
   /* Text colors */
   --doc-text: #202124; /* primary text */
   --doc-text-muted: #5f6368; /* secondary text */
-  --doc-text-subtle: #9aa0a6; /* tertiary/disabled text */
-  --doc-text-placeholder: #999; /* placeholder text */
+  --doc-text-subtle: #6b7280; /* tertiary/disabled text (WCAG AA compliant) */
+  --doc-text-placeholder: #6b7280; /* placeholder text (WCAG AA compliant) */
 
   /* Border colors */
   --doc-border: #e0e0e0; /* standard borders */

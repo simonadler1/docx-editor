@@ -209,7 +209,7 @@ export function HorizontalRuler({
       ref={rulerRef}
       className={`docx-horizontal-ruler ${className}`}
       style={rulerStyle}
-      role="slider"
+      role="group"
       aria-label="Horizontal ruler"
       onClick={(e) => {
         if (!onTabStopAdd || !rulerRef.current || dragging) return;
@@ -221,8 +221,6 @@ export function HorizontalRuler({
           onTabStopAdd(Math.round(positionTwips), 'left');
         }
       }}
-      aria-valuemin={0}
-      aria-valuemax={pageWidthTwips}
     >
       {/* Tick marks */}
       <div

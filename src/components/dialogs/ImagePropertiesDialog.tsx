@@ -196,8 +196,11 @@ export function ImagePropertiesDialog({
           <div style={sectionStyle}>
             <div style={sectionLabelStyle}>Border</div>
             <div style={rowStyle}>
-              <label style={labelStyle}>Width</label>
+              <label htmlFor="img-border-width" style={labelStyle}>
+                Width
+              </label>
               <input
+                id="img-border-width"
                 type="number"
                 style={{ ...inputStyle, maxWidth: 80 }}
                 min={0}
@@ -209,8 +212,11 @@ export function ImagePropertiesDialog({
               <span style={{ fontSize: 12, color: 'var(--doc-text-muted)' }}>px</span>
             </div>
             <div style={rowStyle}>
-              <label style={labelStyle}>Style</label>
+              <label htmlFor="img-border-style" style={labelStyle}>
+                Style
+              </label>
               <select
+                id="img-border-style"
                 style={selectStyle}
                 value={borderStyle}
                 onChange={(e) => setBorderStyle(e.target.value)}
@@ -226,8 +232,11 @@ export function ImagePropertiesDialog({
               </select>
             </div>
             <div style={rowStyle}>
-              <label style={labelStyle}>Color</label>
+              <label htmlFor="img-border-color" style={labelStyle}>
+                Color
+              </label>
               <input
+                id="img-border-color"
                 type="color"
                 value={borderColor}
                 onChange={(e) => setBorderColor(e.target.value)}

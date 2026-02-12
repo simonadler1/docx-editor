@@ -242,8 +242,11 @@ export function ImagePositionDialog({
           <div style={sectionStyle}>
             <div style={sectionLabelStyle}>Horizontal</div>
             <div style={rowStyle}>
-              <label style={labelStyle}>Position</label>
+              <label htmlFor="img-pos-h-mode" style={labelStyle}>
+                Position
+              </label>
               <select
+                id="img-pos-h-mode"
                 style={selectStyle}
                 value={hMode}
                 onChange={(e) => setHMode(e.target.value as 'align' | 'offset')}
@@ -254,8 +257,11 @@ export function ImagePositionDialog({
             </div>
             {hMode === 'align' ? (
               <div style={rowStyle}>
-                <label style={labelStyle}>Align</label>
+                <label htmlFor="img-pos-h-align" style={labelStyle}>
+                  Align
+                </label>
                 <select
+                  id="img-pos-h-align"
                   style={selectStyle}
                   value={hAlign}
                   onChange={(e) => setHAlign(e.target.value)}
@@ -267,8 +273,11 @@ export function ImagePositionDialog({
               </div>
             ) : (
               <div style={rowStyle}>
-                <label style={labelStyle}>Offset (px)</label>
+                <label htmlFor="img-pos-h-offset" style={labelStyle}>
+                  Offset (px)
+                </label>
                 <input
+                  id="img-pos-h-offset"
                   type="number"
                   style={inputStyle}
                   value={hOffset}
@@ -277,8 +286,11 @@ export function ImagePositionDialog({
               </div>
             )}
             <div style={rowStyle}>
-              <label style={labelStyle}>Relative to</label>
+              <label htmlFor="img-pos-h-rel" style={labelStyle}>
+                Relative to
+              </label>
               <select
+                id="img-pos-h-rel"
                 style={selectStyle}
                 value={hRelativeTo}
                 onChange={(e) => setHRelativeTo(e.target.value)}
@@ -295,8 +307,11 @@ export function ImagePositionDialog({
           <div style={sectionStyle}>
             <div style={sectionLabelStyle}>Vertical</div>
             <div style={rowStyle}>
-              <label style={labelStyle}>Position</label>
+              <label htmlFor="img-pos-v-mode" style={labelStyle}>
+                Position
+              </label>
               <select
+                id="img-pos-v-mode"
                 style={selectStyle}
                 value={vMode}
                 onChange={(e) => setVMode(e.target.value as 'align' | 'offset')}
@@ -307,8 +322,11 @@ export function ImagePositionDialog({
             </div>
             {vMode === 'align' ? (
               <div style={rowStyle}>
-                <label style={labelStyle}>Align</label>
+                <label htmlFor="img-pos-v-align" style={labelStyle}>
+                  Align
+                </label>
                 <select
+                  id="img-pos-v-align"
                   style={selectStyle}
                   value={vAlign}
                   onChange={(e) => setVAlign(e.target.value)}
@@ -320,8 +338,11 @@ export function ImagePositionDialog({
               </div>
             ) : (
               <div style={rowStyle}>
-                <label style={labelStyle}>Offset (px)</label>
+                <label htmlFor="img-pos-v-offset" style={labelStyle}>
+                  Offset (px)
+                </label>
                 <input
+                  id="img-pos-v-offset"
                   type="number"
                   style={inputStyle}
                   value={vOffset}
@@ -330,8 +351,11 @@ export function ImagePositionDialog({
               </div>
             )}
             <div style={rowStyle}>
-              <label style={labelStyle}>Relative to</label>
+              <label htmlFor="img-pos-v-rel" style={labelStyle}>
+                Relative to
+              </label>
               <select
+                id="img-pos-v-rel"
                 style={selectStyle}
                 value={vRelativeTo}
                 onChange={(e) => setVRelativeTo(e.target.value)}
@@ -349,8 +373,11 @@ export function ImagePositionDialog({
             <div style={sectionLabelStyle}>Distance from text (px)</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div style={rowStyle}>
-                <label style={{ ...labelStyle, width: 45 }}>Top</label>
+                <label htmlFor="img-pos-dist-top" style={{ ...labelStyle, width: 45 }}>
+                  Top
+                </label>
                 <input
+                  id="img-pos-dist-top"
                   type="number"
                   style={inputStyle}
                   min={0}
@@ -359,8 +386,11 @@ export function ImagePositionDialog({
                 />
               </div>
               <div style={rowStyle}>
-                <label style={{ ...labelStyle, width: 45 }}>Bottom</label>
+                <label htmlFor="img-pos-dist-bottom" style={{ ...labelStyle, width: 45 }}>
+                  Bottom
+                </label>
                 <input
+                  id="img-pos-dist-bottom"
                   type="number"
                   style={inputStyle}
                   min={0}
@@ -369,8 +399,11 @@ export function ImagePositionDialog({
                 />
               </div>
               <div style={rowStyle}>
-                <label style={{ ...labelStyle, width: 45 }}>Left</label>
+                <label htmlFor="img-pos-dist-left" style={{ ...labelStyle, width: 45 }}>
+                  Left
+                </label>
                 <input
+                  id="img-pos-dist-left"
                   type="number"
                   style={inputStyle}
                   min={0}
@@ -379,8 +412,11 @@ export function ImagePositionDialog({
                 />
               </div>
               <div style={rowStyle}>
-                <label style={{ ...labelStyle, width: 45 }}>Right</label>
+                <label htmlFor="img-pos-dist-right" style={{ ...labelStyle, width: 45 }}>
+                  Right
+                </label>
                 <input
+                  id="img-pos-dist-right"
                   type="number"
                   style={inputStyle}
                   min={0}

@@ -497,7 +497,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       </div>
 
       {/* Menu items */}
-      <div role="group">
+      <div role="group" aria-label="Menu actions">
         {allActions.map((action, index) => (
           <MenuItem
             key={action}

@@ -200,7 +200,6 @@ export function ListButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
-      role="button"
     >
       {children}
     </button>

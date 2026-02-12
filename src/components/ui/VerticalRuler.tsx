@@ -163,9 +163,8 @@ export function VerticalRuler({
       ref={rulerRef}
       className={`docx-vertical-ruler ${className}`}
       style={rulerStyle}
-      role="slider"
+      role="group"
       aria-label="Vertical ruler"
-      aria-orientation="vertical"
     >
       {/* Tick marks */}
       <div
@@ -305,6 +304,9 @@ function VerticalMarginMarker({
       role="slider"
       aria-label={type === 'topMargin' ? 'Top margin' : 'Bottom margin'}
       aria-orientation="vertical"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={0}
       tabIndex={editable ? 0 : -1}
     >
       <div style={triangleStyle} />

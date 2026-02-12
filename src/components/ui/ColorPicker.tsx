@@ -533,6 +533,7 @@ export function ColorPicker({
           className="docx-color-picker-dropdown"
           style={{ ...DROPDOWN_STYLE, width: dropdownWidth }}
           role="dialog"
+          aria-modal="true"
           aria-label={`${type === 'text' ? 'Font' : 'Highlight'} color picker`}
           onMouseDown={(e) => e.preventDefault()} // Prevent focus stealing from editor
         >
