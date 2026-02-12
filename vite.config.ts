@@ -16,5 +16,24 @@ export default defineConfig({
   },
   build: {
     outDir: '../dist/demo',
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-prosemirror': [
+            'prosemirror-model',
+            'prosemirror-state',
+            'prosemirror-view',
+            'prosemirror-commands',
+            'prosemirror-history',
+            'prosemirror-keymap',
+            'prosemirror-dropcursor',
+            'prosemirror-tables',
+          ],
+          'vendor-docx': ['jszip', 'pizzip', 'docxtemplater', 'xml-js'],
+        },
+      },
+    },
   },
 });

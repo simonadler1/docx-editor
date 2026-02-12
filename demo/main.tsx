@@ -68,7 +68,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   fileName: {
     fontSize: '13px',
-    color: '#64748b',
+    color: '#475569',
     padding: '4px 10px',
     background: '#f1f5f9',
     borderRadius: '6px',
@@ -127,7 +127,7 @@ const styles: Record<string, React.CSSProperties> = {
   navLinkActive: {
     padding: '6px 12px',
     fontSize: '13px',
-    color: '#3b82f6',
+    color: '#2563eb',
     textDecoration: 'none',
     background: '#eff6ff',
     borderRadius: '4px',
