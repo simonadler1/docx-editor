@@ -3,6 +3,7 @@
   "compatibility_date": "2026-02-12",
   "assets": {
     "directory": "./dist/demo",
+    "not_found_handling": "single-page-application",
   },
   "observability": {
     "enabled": false,
